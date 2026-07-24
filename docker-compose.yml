@@ -1,0 +1,24 @@
+version: '3.8'
+
+services:
+  market-data-collector:
+    build: .
+    container_name: crypto-market-data-collector
+    restart: unless-stopped
+    volumes:
+      # Bind mount local directory to persist cached data across container lifecycles
+      - ./local_cache:/app/local_cache
+    env_file:
+      - .env
+    environment:
+      # Defaults if .env file is missing or values are unset
+      - S3_BUCKET_NAME=${S3_BUCKET_NAME:-your-market-data-bucket}
+      - S3_REGION=${S3_REGION:-us-east-1}
+      - S3_PREFIX=${S3_PREFIX:-crypto-market-data/}
+      - UPLOAD_DELAY_MINUTES=${UPLOAD_DELAY_MINUTES:-5}
+      - LOCAL_DATA_DIR=/app/local_cache
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "5"

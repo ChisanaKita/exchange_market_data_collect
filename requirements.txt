@@ -1,0 +1,7 @@
+websockets>=12.0
+aiohttp>=3.9.0
+boto3>=1.34.0
+python-dotenv>=1.0.1
+pytz>=2024.1
+awscrt>=0.21.0
+
