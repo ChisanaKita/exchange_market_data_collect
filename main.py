@@ -7,16 +7,23 @@ from writer import MarketDataWriter
 from uploader import MarketDataUploader
 from collectors import (
     HashkeyCollector,
+    HashkeyMenaCollector,
     BitgetCollector,
     GateCollector,
     OSLCollector
 )
 from config import (
     TARGET_SYMBOLS,
+    HASHKEY_MENA_TARGET_SYMBOLS,
     HASHKEY_WS_URL,
     HASHKEY_REST_URL,
     HASHKEY_REST_POLL_INTERVAL_MS,
     HASHKEY_REST_RATE_LIMIT_RPS,
+    HASHKEY_MENA_WS_URL,
+    HASHKEY_MENA_REST_URL,
+    HASHKEY_MENA_REST_POLL_INTERVAL_MS,
+    HASHKEY_MENA_REST_RATE_LIMIT_RPS,
+    HASHKEY_MENA_FUNDING_RATE_DELAY_MS,
     BITGET_WS_URL,
     BITGET_REST_URL,
     BITGET_REST_POLL_INTERVAL_MS,
@@ -76,6 +83,15 @@ class Application:
                 rest_poll_interval_ms=HASHKEY_REST_POLL_INTERVAL_MS,
                 ws_url=HASHKEY_WS_URL,
                 rest_url=HASHKEY_REST_URL
+            ),
+            HashkeyMenaCollector(
+                writer=self.writer,
+                target_symbols=HASHKEY_MENA_TARGET_SYMBOLS,
+                rest_rate_limit_rps=HASHKEY_MENA_REST_RATE_LIMIT_RPS,
+                rest_poll_interval_ms=HASHKEY_MENA_REST_POLL_INTERVAL_MS,
+                funding_rate_delay_ms=HASHKEY_MENA_FUNDING_RATE_DELAY_MS,
+                ws_url=HASHKEY_MENA_WS_URL,
+                rest_url=HASHKEY_MENA_REST_URL
             ),
             BitgetCollector(
                 writer=self.writer,

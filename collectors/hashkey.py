@@ -2,7 +2,7 @@ import asyncio
 import json
 import logging
 from datetime import datetime, timezone
-from typing import List
+from typing import Dict, List
 
 from collectors.base import BaseExchangeCollector
 from writer import MarketDataWriter
@@ -21,6 +21,11 @@ class HashkeyCollector(BaseExchangeCollector):
         "BTCUSD-PERPETUAL": "BTCUSD-PERPETUAL"
     }
 
+    # Extra fields merged into every WS subscription payload / REST query.
+    # Regional sites sharing one host (e.g. MENA on api-pro) use these to select the market site.
+    WS_SUBSCRIBE_EXTRA: Dict[str, str] = {}
+    REST_EXTRA_PARAMS: Dict[str, str] = {}
+
     def __init__(
         self,
         writer: MarketDataWriter,
@@ -34,6 +39,10 @@ class HashkeyCollector(BaseExchangeCollector):
         super().__init__(writer, self.mapped_symbols, rest_rate_limit_rps, rest_poll_interval_ms)
         self.ws_url = ws_url
         self.rest_url = rest_url
+
+    @staticmethod
+    def get_market_type(symbol: str) -> str:
+        return "futures" if "PERPETUAL" in symbol else "spot"
 
     def _start_ws_tasks(self) -> List[asyncio.Task]:
         """Start the WebSocket loop."""
@@ -70,6 +79,7 @@ class HashkeyCollector(BaseExchangeCollector):
                 {"topic": "bbo", "event": "sub", "params": {"symbol": symbol}}
             ]
             for sub in subscriptions:
+                sub.update(self.WS_SUBSCRIBE_EXTRA)
                 self.logger.debug(f"Subscribing: {sub}")
                 await ws.send(json.dumps(sub))
 
@@ -100,12 +110,14 @@ class HashkeyCollector(BaseExchangeCollector):
             if not symbol or symbol not in self.target_symbols:
                 return
 
+            market_type = self.get_market_type(symbol)
+
             # 1. Handle Klines
             if topic == "kline":
                 await self.writer.write(
                     exchange=self.exchange_name,
                     symbol=symbol,
-                    market_type="futures",
+                    market_type=market_type,
                     category="kline_1m",
                     record={
                         "timestamp": data.get("t"),
@@ -125,7 +137,7 @@ class HashkeyCollector(BaseExchangeCollector):
                 await self.writer.write(
                     exchange=self.exchange_name,
                     symbol=symbol,
-                    market_type="futures",
+                    market_type=market_type,
                     category="trades",
                     record={
                         "timestamp": data.get("t"),
@@ -144,7 +156,7 @@ class HashkeyCollector(BaseExchangeCollector):
                 await self.writer.write(
                     exchange=self.exchange_name,
                     symbol=symbol,
-                    market_type="futures",
+                    market_type=market_type,
                     category="depth",
                     record={
                         "timestamp": data.get("t"),
@@ -160,7 +172,7 @@ class HashkeyCollector(BaseExchangeCollector):
                 await self.writer.write(
                     exchange=self.exchange_name,
                     symbol=symbol,
-                    market_type="futures",
+                    market_type=market_type,
                     category="bbo",
                     record={
                         "timestamp": data.get("t"),
@@ -179,7 +191,7 @@ class HashkeyCollector(BaseExchangeCollector):
     async def _fetch_and_write_rest_orderbook(self, symbol: str):
         """Fetch depth from REST API and write to storage."""
         depth_url = f"{self.rest_url}/quote/v1/depth"
-        params = {"symbol": symbol, "limit": "20"}
+        params = {"symbol": symbol, "limit": "20", **self.REST_EXTRA_PARAMS}
         async with self.session.get(depth_url, params=params, timeout=5) as response:
             raw_data = await response.json()
             
@@ -189,7 +201,7 @@ class HashkeyCollector(BaseExchangeCollector):
             await self.writer.write(
                 exchange=self.exchange_name,
                 symbol=symbol,
-                market_type="futures",
+                market_type=self.get_market_type(symbol),
                 category="orderbook_rest",
                 record={
                     "timestamp": raw_data.get("t"),

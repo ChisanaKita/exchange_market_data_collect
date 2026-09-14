@@ -28,6 +28,15 @@ TARGET_SYMBOLS = [
     "USDTUSDC"
 ]
 
+# Hashkey MENA (UAE) lists tokenised equity/ETF perpetuals not available elsewhere,
+# so it gets its own target list. Only the MENA collector receives these.
+HASHKEY_MENA_TARGET_SYMBOLS = TARGET_SYMBOLS + [
+    "SKHYNIXUSDT-PERPETUAL",
+    "QQQUSDT-PERPETUAL",
+    "SPCXUSDT-PERPETUAL",
+    "SOXLUSDT-PERPETUAL"
+]
+
 # --- Connection Settings ---
 
 # 1. Hashkey Settings
@@ -35,6 +44,14 @@ HASHKEY_WS_URL = os.getenv("HASHKEY_WS_URL", "wss://stream-glb.hashkey.com/quote
 HASHKEY_REST_URL = os.getenv("HASHKEY_REST_URL", "https://api-glb.hashkey.com")
 HASHKEY_REST_POLL_INTERVAL_MS = int(os.getenv("HASHKEY_REST_POLL_INTERVAL_MS", "200"))
 HASHKEY_REST_RATE_LIMIT_RPS = float(os.getenv("HASHKEY_REST_RATE_LIMIT_RPS", "1.5"))
+
+# 1b. Hashkey MENA (UAE) Settings — served from the HK platform hosts with site=MENA
+HASHKEY_MENA_WS_URL = os.getenv("HASHKEY_MENA_WS_URL", "wss://stream-pro.hashkey.com/quote/ws/v2")
+HASHKEY_MENA_REST_URL = os.getenv("HASHKEY_MENA_REST_URL", "https://api-pro.hashkey.com")
+HASHKEY_MENA_REST_POLL_INTERVAL_MS = int(os.getenv("HASHKEY_MENA_REST_POLL_INTERVAL_MS", "200"))
+HASHKEY_MENA_REST_RATE_LIMIT_RPS = float(os.getenv("HASHKEY_MENA_REST_RATE_LIMIT_RPS", "1.5"))
+# Delay between consecutive (sequential) funding rate queries
+HASHKEY_MENA_FUNDING_RATE_DELAY_MS = int(os.getenv("HASHKEY_MENA_FUNDING_RATE_DELAY_MS", "500"))
 
 # 2. Bitget Settings
 BITGET_WS_URL = os.getenv("BITGET_WS_URL", "wss://ws.bitget.com/v2/ws/public")

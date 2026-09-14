@@ -192,6 +192,22 @@ High-frequency order book snapshot fetched via REST API (by default every 200 ms
 }
 ```
 
+### 6. REST Funding Rate (`category: "funding_rate"`, Hashkey MENA only)
+Current funding rate per perpetual, polled sequentially via `GET /api/v2/futures/fundingRate` with a 500 ms delay between symbols. `timestamp` is the query time.
+```json
+{
+  "timestamp": 1789365000000,
+  "datetime": "2026-09-14T05:50:00.000000Z",
+  "exchange": "hashkey_mena",
+  "symbol": "BTCUSDT-PERPETUAL",
+  "market_type": "futures",
+  "category": "funding_rate",
+  "rate": 0.0001,
+  "next_funding_time": 1789372800000,
+  "raw": { ... }
+}
+```
+
 ---
 
 ## 🛠️ Configuration (.env)
@@ -207,6 +223,11 @@ Adjust parameters by copying `.env.example` to `.env` or setting system environm
 | `UPLOAD_DELAY_MINUTES` | Wait minutes after UTC midnight before archiving the past day | `5` |
 | `HASHKEY_REST_POLL_INTERVAL_MS` | Frequency of Hashkey REST depth requests in milliseconds | `200` |
 | `HASHKEY_REST_RATE_LIMIT_RPS` | Global safety cap of requests per second for Hashkey REST queries | `1.5` |
+| `HASHKEY_MENA_WS_URL` | Hashkey MENA (UAE) WebSocket URL (HK platform host; `site=MENA` is sent on every subscription) | `wss://stream-pro.hashkey.com/quote/ws/v2` |
+| `HASHKEY_MENA_REST_URL` | Hashkey MENA (UAE) REST base URL (HK platform host; `site=MENA` is sent on every request) | `https://api-pro.hashkey.com` |
+| `HASHKEY_MENA_REST_POLL_INTERVAL_MS` | Frequency of Hashkey MENA REST depth requests in milliseconds | `200` |
+| `HASHKEY_MENA_REST_RATE_LIMIT_RPS` | Global safety cap of requests per second for Hashkey MENA REST queries | `1.5` |
+| `HASHKEY_MENA_FUNDING_RATE_DELAY_MS` | Delay between sequential Hashkey MENA funding rate queries (one perpetual per query) | `500` |
 | `BULLISH_REST_POLL_INTERVAL_MS` | Frequency of Bullish REST depth requests in milliseconds | `200` |
 | `BULLISH_REST_RATE_LIMIT_RPS` | Global safety cap of requests per second for Bullish REST queries | `2.0` |
 | `BITGET_REST_POLL_INTERVAL_MS` | Frequency of Bitget REST depth requests in milliseconds | `200` |
