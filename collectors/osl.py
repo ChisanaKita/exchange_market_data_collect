@@ -34,17 +34,12 @@ class OSLCollector(BaseExchangeCollector):
         self,
         writer: MarketDataWriter,
         target_symbols: List[str],
-        api_key: str = "",
-        api_secret: str = "",
         ws_url: str = OSL_WS_URL,
         rest_url: str = OSL_REST_URL,
         rest_rate_limit_rps: float = 2.0,
         rest_poll_interval_ms: int = 200
     ):
         super().__init__(writer, target_symbols, rest_rate_limit_rps, rest_poll_interval_ms)
-        # Public endpoints only; credentials are reserved for private channels.
-        self.api_key = api_key
-        self.api_secret = api_secret
         self.ws_url = ws_url
         self.rest_url = rest_url
 

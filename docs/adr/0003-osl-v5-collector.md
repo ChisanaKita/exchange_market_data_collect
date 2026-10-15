@@ -24,6 +24,8 @@ are `ticker`, `books5`/`books15` and `trade`; the documented REST market-data en
   collector labelled `BTCUSDC` as `futures` only because it was mapped from `BTC-PERP`.
 - Symbols come from `OSL_TARGET_SYMBOLS` verbatim ([0002](0002-config-is-the-single-symbol-source.md)).
   The default is `BTCUSD,USDTUSD`; `BTCUSDC` does not exist on v5.
+- Only public endpoints are used, so the collector takes no API key or secret (the old `OSL_API_KEY`,
+  `OSL_API_SECRET` and `OSL_FIX_*` settings were unused and are removed).
 - The base REST hook is renamed `_fetch_and_write_rest` because OSL's REST source is not an order book.
 - REST errors arrive as HTTP 200 with `{"code": ..., "msg": ...}` and are raised so they are logged
   instead of being stored as data.

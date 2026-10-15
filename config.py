@@ -170,8 +170,6 @@ GATE_REST_POLL_INTERVAL_MS = int(os.getenv("GATE_REST_POLL_INTERVAL_MS", "200"))
 GATE_REST_RATE_LIMIT_RPS = float(os.getenv("GATE_REST_RATE_LIMIT_RPS", "2.0"))
 
 # 5. OSL Settings
-OSL_API_KEY = os.getenv("OSL_API_KEY", "")
-OSL_API_SECRET = os.getenv("OSL_API_SECRET", "")
 OSL_REST_URL = os.getenv("OSL_REST_URL", "https://trade-hk.osl.com/api/v5")
 OSL_WS_URL = os.getenv("OSL_WS_URL", "wss://stream-hk.osl.com/ws/v5/public")
 OSL_REST_POLL_INTERVAL_MS = int(os.getenv("OSL_REST_POLL_INTERVAL_MS", "200"))

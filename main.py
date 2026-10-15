@@ -42,8 +42,6 @@ from config import (
     GATE_REST_URL,
     GATE_REST_POLL_INTERVAL_MS,
     GATE_REST_RATE_LIMIT_RPS,
-    OSL_API_KEY,
-    OSL_API_SECRET,
     OSL_REST_URL,
     OSL_WS_URL,
     OSL_REST_POLL_INTERVAL_MS,
@@ -130,8 +128,6 @@ class Application:
             OSLCollector(
                 writer=self.writer,
                 target_symbols=OSL_TARGET_SYMBOLS,
-                api_key=OSL_API_KEY,
-                api_secret=OSL_API_SECRET,
                 ws_url=OSL_WS_URL,
                 rest_url=OSL_REST_URL,
                 rest_rate_limit_rps=OSL_REST_RATE_LIMIT_RPS,
