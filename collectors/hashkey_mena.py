@@ -17,19 +17,6 @@ HASHKEY_MENA_REST_URL = "https://api-pro.hashkey.com"
 class HashkeyMenaCollector(HashkeyCollector):
     exchange_name: str = "hashkey_mena"
 
-    # MENA listings as of 2026-09: USDT perpetuals (crypto + tokenised equities/ETFs)
-    # plus USD/USDT/AED spot pairs.
-    UNIFIED_TO_EXCHANGE = {
-        "BTCUSDT-PERPETUAL": "BTCUSDT-PERPETUAL",
-        "ETHUSDT-PERPETUAL": "ETHUSDT-PERPETUAL",
-        "SKHYNIXUSDT-PERPETUAL": "SKHYNIXUSDT-PERPETUAL",
-        "QQQUSDT-PERPETUAL": "QQQUSDT-PERPETUAL",
-        "SPCXUSDT-PERPETUAL": "SPCXUSDT-PERPETUAL",
-        "SOXLUSDT-PERPETUAL": "SOXLUSDT-PERPETUAL",
-        "USDTUSDC": "USDTUSDC"
-    }
-    EXCHANGE_TO_UNIFIED = {v: k for k, v in UNIFIED_TO_EXCHANGE.items()}
-
     WS_SUBSCRIBE_EXTRA = {"site": "MENA"}
     REST_EXTRA_PARAMS = {"site": "MENA"}
 
@@ -108,7 +95,7 @@ class HashkeyMenaCollector(HashkeyCollector):
                 next_funding_time = entry.get("nextFundingTime")
                 await self.writer.write(
                     exchange=self.exchange_name,
-                    symbol=self.to_unified_symbol(entry.get("symbol", symbol)),
+                    symbol=entry.get("symbol", symbol),
                     market_type="futures",
                     category="funding_rate",
                     record={

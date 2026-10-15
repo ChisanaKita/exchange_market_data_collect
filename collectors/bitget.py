@@ -15,16 +15,6 @@ BITGET_REST_URL = "https://api.bitget.com"
 class BitgetCollector(BaseExchangeCollector):
     exchange_name: str = "bitget"
 
-    # Map unified symbols to Bitget symbols
-    UNIFIED_TO_EXCHANGE = {
-        "BTCUSDT-PERPETUAL": "BTCUSDT",
-        "ETHUSDT-PERPETUAL": "ETHUSDT",
-        "BTCUSD-PERPETUAL": "BTCUSD"
-    }
-    EXCHANGE_TO_UNIFIED = {v: k for k, v in UNIFIED_TO_EXCHANGE.items()}
-    # WS/REST routing is hard-wired to USDT-FUTURES / COIN-FUTURES, so unmapped symbols cannot work
-    STRICT_SYMBOL_MAPPING = True
-
     def __init__(
         self,
         writer: MarketDataWriter,
@@ -34,14 +24,9 @@ class BitgetCollector(BaseExchangeCollector):
         ws_url: str = BITGET_WS_URL,
         rest_url: str = BITGET_REST_URL
     ):
-        self.mapped_symbols = self.map_target_symbols(target_symbols)
-        super().__init__(writer, self.mapped_symbols, rest_rate_limit_rps, rest_poll_interval_ms)
+        super().__init__(writer, target_symbols, rest_rate_limit_rps, rest_poll_interval_ms)
         self.ws_url = ws_url
         self.rest_url = rest_url
-
-    def to_unified_symbol(self, exchange_symbol: str) -> str:
-        """Convert exchange symbol back to unified symbol."""
-        return self.EXCHANGE_TO_UNIFIED.get(exchange_symbol, exchange_symbol)
 
     def get_inst_type(self, symbol: str) -> str:
         """Determine Bitget instType for WebSocket."""
@@ -132,7 +117,6 @@ class BitgetCollector(BaseExchangeCollector):
 
             channel = arg.get("channel")
             exchange_symbol = arg.get("instId")
-            unified_symbol = self.to_unified_symbol(exchange_symbol)
             push_ts = msg.get("ts") or int(datetime.now(timezone.utc).timestamp() * 1000)
 
             # 1. Handle Klines (candle1m)
@@ -142,7 +126,7 @@ class BitgetCollector(BaseExchangeCollector):
                     ts = int(candle[0])
                     await self.writer.write(
                         exchange=self.exchange_name,
-                        symbol=unified_symbol,
+                        symbol=exchange_symbol,
                         market_type="futures",
                         category="kline_1m",
                         record={
@@ -165,7 +149,7 @@ class BitgetCollector(BaseExchangeCollector):
                     ts = int(trade.get("ts"))
                     await self.writer.write(
                         exchange=self.exchange_name,
-                        symbol=unified_symbol,
+                        symbol=exchange_symbol,
                         market_type="futures",
                         category="trades",
                         record={
@@ -186,7 +170,7 @@ class BitgetCollector(BaseExchangeCollector):
                     ts = int(depth.get("ts") or push_ts)
                     await self.writer.write(
                         exchange=self.exchange_name,
-                        symbol=unified_symbol,
+                        symbol=exchange_symbol,
                         market_type="futures",
                         category="depth",
                         record={
@@ -212,7 +196,7 @@ class BitgetCollector(BaseExchangeCollector):
                     ts = int(bbo.get("ts") or push_ts)
                     await self.writer.write(
                         exchange=self.exchange_name,
-                        symbol=unified_symbol,
+                        symbol=exchange_symbol,
                         market_type="futures",
                         category="bbo",
                         record={
@@ -229,12 +213,11 @@ class BitgetCollector(BaseExchangeCollector):
         except Exception as e:
             self.logger.error(f"Error parsing Bitget WS message: {e}", exc_info=True)
 
-    async def _fetch_and_write_rest_orderbook(self, symbol: str):
+    async def _fetch_and_write_rest(self, symbol: str):
         """Fetch depth from Bitget REST API and write to storage."""
         # Endpoint: GET /api/v2/mix/market/depth
         depth_url = f"{self.rest_url}/api/v2/mix/market/depth"
         product_type = self.get_product_type(symbol)
-        unified_symbol = self.to_unified_symbol(symbol)
 
         params = {
             "symbol": symbol,
@@ -254,7 +237,7 @@ class BitgetCollector(BaseExchangeCollector):
 
             await self.writer.write(
                 exchange=self.exchange_name,
-                symbol=unified_symbol,
+                symbol=symbol,
                 market_type="futures",
                 category="orderbook_rest",
                 record={

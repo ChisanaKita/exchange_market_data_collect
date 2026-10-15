@@ -33,7 +33,9 @@ def _parse_symbol_list(env_var_name: str, default: list) -> list:
             symbols.append(symbol)
     return symbols
 
-# Per-exchange fine-grained target symbol lists
+# Per-exchange target symbol lists. This file is the single source of truth: every symbol is the
+# exchange-native name and is used verbatim for subscriptions, REST polling and the output path
+# (e.g. Bitget "BTCUSDT", Gate.io "BTC_USDT", HashKey "BTCUSDT-PERPETUAL"). Collectors do no translation.
 # 1a. Hashkey Global
 HASHKEY_GLOBAL_TARGET_SYMBOLS = _parse_symbol_list(
     "HASHKEY_GLOBAL_TARGET_SYMBOLS",
@@ -47,9 +49,6 @@ HASHKEY_GLOBAL_TARGET_SYMBOLS = _parse_symbol_list(
 HASHKEY_HK_TARGET_SYMBOLS = _parse_symbol_list(
     "HASHKEY_HK_TARGET_SYMBOLS",
     [
-        "BTCUSDT-PERPETUAL",
-        "ETHUSDT-PERPETUAL",
-        "BTCUSD-PERPETUAL",
         "BTCUSD",
         "BTCUSDT",
         "ETHUSD",
@@ -59,6 +58,8 @@ HASHKEY_HK_TARGET_SYMBOLS = _parse_symbol_list(
         "XRPUSD",
         "LINKUSD",
         "ARBUSD",
+        "USDTUSD",
+        "USDTHKD"
     ],
 )
 
@@ -73,23 +74,24 @@ HASHKEY_MENA_TARGET_SYMBOLS = _parse_symbol_list(
         "SPCXUSDT-PERPETUAL",
         "SOXLUSDT-PERPETUAL",
         "USDTUSDC",
+        "USDTAED",
     ],
 )
 
 # 2. Bitget
 BITGET_TARGET_SYMBOLS = _parse_symbol_list(
     "BITGET_TARGET_SYMBOLS",
-    ["BTCUSDT-PERPETUAL", "ETHUSDT-PERPETUAL", "BTCUSD-PERPETUAL"],
+    ["BTCUSDT", "ETHUSDT"],
 )
 
 # 3. Gate.io
 GATE_TARGET_SYMBOLS = _parse_symbol_list(
     "GATE_TARGET_SYMBOLS",
-    ["BTCUSDT-PERPETUAL", "ETHUSDT-PERPETUAL", "BTCUSD-PERPETUAL"],
+    ["BTC_USDT", "ETH_USDT", "BTC_USD"],
 )
 
 # 4. OSL
-OSL_TARGET_SYMBOLS = _parse_symbol_list("OSL_TARGET_SYMBOLS", ["BTCUSDC", "USDTUSD"])
+OSL_TARGET_SYMBOLS = _parse_symbol_list("OSL_TARGET_SYMBOLS", ["BTCUSD", "USDTUSD"])
 
 # Registry dictionary mapping exchange keys to target symbol lists
 EXCHANGE_TARGET_SYMBOLS = {
@@ -173,7 +175,7 @@ GATE_REST_RATE_LIMIT_RPS = float(os.getenv("GATE_REST_RATE_LIMIT_RPS", "2.0"))
 # 5. OSL Settings
 OSL_API_KEY = os.getenv("OSL_API_KEY", "")
 OSL_API_SECRET = os.getenv("OSL_API_SECRET", "")
-OSL_REST_URL = os.getenv("OSL_REST_URL", "https://api.osl.com")
-OSL_WS_URL = os.getenv("OSL_WS_URL", "wss://stream-api.osl.com/openapi/v1/ws")
+OSL_REST_URL = os.getenv("OSL_REST_URL", "https://trade-hk.osl.com/api/v5")
+OSL_WS_URL = os.getenv("OSL_WS_URL", "wss://stream-hk.osl.com/ws/v5/public")
 OSL_REST_POLL_INTERVAL_MS = int(os.getenv("OSL_REST_POLL_INTERVAL_MS", "200"))
 OSL_REST_RATE_LIMIT_RPS = float(os.getenv("OSL_REST_RATE_LIMIT_RPS", "2.0"))

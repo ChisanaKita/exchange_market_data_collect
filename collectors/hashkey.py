@@ -20,16 +20,8 @@ class HashkeyCollector(BaseExchangeCollector):
 
     Not instantiated directly: use HashkeyGlobalCollector, HashkeyHkCollector or
     HashkeyMenaCollector, each of which sets its own exchange_name and site parameters.
-    Symbols outside UNIFIED_TO_EXCHANGE are passed through as exchange-native symbols,
-    since the HK and MENA sites list many spot pairs beyond the perpetuals mapped here.
+    Target symbols are HashKey-native and used verbatim (see config.py).
     """
-
-    UNIFIED_TO_EXCHANGE = {
-        "BTCUSDT-PERPETUAL": "BTCUSDT-PERPETUAL",
-        "ETHUSDT-PERPETUAL": "ETHUSDT-PERPETUAL",
-        "BTCUSD-PERPETUAL": "BTCUSD-PERPETUAL"
-    }
-    EXCHANGE_TO_UNIFIED = {v: k for k, v in UNIFIED_TO_EXCHANGE.items()}
 
     # Extra fields merged into every WS subscription payload / REST query.
     # Regional sites sharing one host (e.g. HK/MENA on api-pro) use these to select the market site.
@@ -45,15 +37,10 @@ class HashkeyCollector(BaseExchangeCollector):
         ws_url: str = HASHKEY_GLOBAL_WS_URL,
         rest_url: str = HASHKEY_GLOBAL_REST_URL
     ):
-        self.mapped_symbols = self.map_target_symbols(target_symbols)
-        super().__init__(writer, self.mapped_symbols, rest_rate_limit_rps, rest_poll_interval_ms)
+        super().__init__(writer, target_symbols, rest_rate_limit_rps, rest_poll_interval_ms)
         self.ws_url = ws_url
         self.rest_url = rest_url
 
-
-    def to_unified_symbol(self, exchange_symbol: str) -> str:
-        """Convert exchange symbol back to unified symbol."""
-        return self.EXCHANGE_TO_UNIFIED.get(exchange_symbol, exchange_symbol)
 
     @staticmethod
     def get_market_type(symbol: str) -> str:
@@ -127,13 +114,12 @@ class HashkeyCollector(BaseExchangeCollector):
                 return
 
             market_type = self.get_market_type(symbol)
-            unified_symbol = self.to_unified_symbol(symbol)
 
             # 1. Handle Klines
             if topic == "kline":
                 await self.writer.write(
                     exchange=self.exchange_name,
-                    symbol=unified_symbol,
+                    symbol=symbol,
                     market_type=market_type,
                     category="kline_1m",
                     record={
@@ -153,7 +139,7 @@ class HashkeyCollector(BaseExchangeCollector):
             elif topic == "trade":
                 await self.writer.write(
                     exchange=self.exchange_name,
-                    symbol=unified_symbol,
+                    symbol=symbol,
                     market_type=market_type,
                     category="trades",
                     record={
@@ -172,7 +158,7 @@ class HashkeyCollector(BaseExchangeCollector):
                 asks = [[float(p), float(q)] for p, q in data.get("a", [])]
                 await self.writer.write(
                     exchange=self.exchange_name,
-                    symbol=unified_symbol,
+                    symbol=symbol,
                     market_type=market_type,
                     category="depth",
                     record={
@@ -188,7 +174,7 @@ class HashkeyCollector(BaseExchangeCollector):
             elif topic == "bbo":
                 await self.writer.write(
                     exchange=self.exchange_name,
-                    symbol=unified_symbol,
+                    symbol=symbol,
                     market_type=market_type,
                     category="bbo",
                     record={
@@ -205,7 +191,7 @@ class HashkeyCollector(BaseExchangeCollector):
         except Exception as e:
             self.logger.error(f"Error parsing WS message: {e}", exc_info=True)
 
-    async def _fetch_and_write_rest_orderbook(self, symbol: str):
+    async def _fetch_and_write_rest(self, symbol: str):
         """Fetch depth from REST API and write to storage."""
         depth_url = f"{self.rest_url}/quote/v1/depth"
         params = {"symbol": symbol, "limit": "20", **self.REST_EXTRA_PARAMS}
@@ -217,7 +203,7 @@ class HashkeyCollector(BaseExchangeCollector):
 
             await self.writer.write(
                 exchange=self.exchange_name,
-                symbol=self.to_unified_symbol(symbol),
+                symbol=symbol,
                 market_type=self.get_market_type(symbol),
                 category="orderbook_rest",
                 record={

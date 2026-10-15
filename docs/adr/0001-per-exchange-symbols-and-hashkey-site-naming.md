@@ -1,6 +1,6 @@
 # 0001. Per-exchange target symbols and HashKey site naming
 
-- Status: Accepted
+- Status: Accepted (decisions 1 and 2 superseded by [0002](0002-config-is-the-single-symbol-source.md))
 - Date: 2026-10-15
 
 ## Context

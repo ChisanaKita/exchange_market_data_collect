@@ -30,30 +30,6 @@ class AsyncRateLimiter:
 class BaseExchangeCollector:
     exchange_name: str = "base"
 
-    # Unified -> exchange-native symbol map, defined by each exchange collector.
-    UNIFIED_TO_EXCHANGE: Dict[str, str] = {}
-    # True: symbols missing from UNIFIED_TO_EXCHANGE are dropped with a warning.
-    # False: they are passed through unchanged as exchange-native symbols.
-    STRICT_SYMBOL_MAPPING: bool = False
-
-    @classmethod
-    def map_target_symbols(cls, target_symbols: List[str]) -> List[str]:
-        """Normalize configured symbols to exchange-native ones: upper-cased, mapped, de-duplicated."""
-        mapped: List[str] = []
-        for raw in target_symbols:
-            symbol = raw.strip().upper()
-            exchange_symbol = cls.UNIFIED_TO_EXCHANGE.get(symbol)
-            if exchange_symbol is None:
-                if cls.STRICT_SYMBOL_MAPPING:
-                    logging.getLogger(cls.__name__).warning(
-                        f"Ignoring unsupported symbol '{raw}'. Supported: {sorted(cls.UNIFIED_TO_EXCHANGE)}"
-                    )
-                    continue
-                exchange_symbol = symbol
-            if exchange_symbol not in mapped:
-                mapped.append(exchange_symbol)
-        return mapped
-
     def __init__(
         self,
         writer: MarketDataWriter,
@@ -166,24 +142,30 @@ class BaseExchangeCollector:
                 await self.rate_limiter.acquire()
 
                 # Perform fetch
-                await self._fetch_and_write_rest_orderbook(symbol)
+                await self._fetch_and_write_rest(symbol)
 
             except asyncio.CancelledError:
                 break
             except aiohttp.ClientResponseError as cre:
-                if cre.status == 429:
-                    self.logger.warning(f"REST orderbook polling hit HTTP 429 (Too Many Requests). Setting global backoff for 60 seconds...")
-                    self.global_backoff_until = asyncio.get_event_loop().time() + 60.0
+                if cre.status in (429, 418):
+                    # 429 = throttled, 418 = temporary IP ban; honour Retry-After when the server sends it
+                    try:
+                        backoff = float((cre.headers or {}).get("Retry-After", 60.0))
+                    except (TypeError, ValueError):
+                        backoff = 60.0
+                    backoff = max(backoff, 1.0)
+                    self.logger.warning(f"REST polling hit HTTP {cre.status}. Setting global backoff for {backoff:.0f} seconds...")
+                    self.global_backoff_until = asyncio.get_event_loop().time() + backoff
                 else:
-                    self.logger.error(f"HTTP error fetching REST orderbook for {symbol}: status={cre.status}, msg={cre.message}")
+                    self.logger.error(f"HTTP error fetching REST data for {symbol}: status={cre.status}, msg={cre.message}")
             except Exception as e:
-                self.logger.error(f"Error polling REST orderbook for {symbol}: {e}")
+                self.logger.error(f"Error polling REST data for {symbol}: {e}")
 
             # Space out consecutive requests of the same poller task
             elapsed = asyncio.get_event_loop().time() - start_time
             sleep_time = max(0.01, poll_interval_sec - elapsed)
             await asyncio.sleep(sleep_time)
 
-    async def _fetch_and_write_rest_orderbook(self, symbol: str):
-        """Fetch REST orderbook snapshot and write it. Must be implemented in subclass."""
+    async def _fetch_and_write_rest(self, symbol: str):
+        """Fetch the REST market-data snapshot for a symbol and write it. Must be implemented in subclass."""
         raise NotImplementedError

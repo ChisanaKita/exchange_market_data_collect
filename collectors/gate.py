@@ -16,16 +16,6 @@ GATE_REST_URL = "https://fx-api.gateio.ws/api/v4"
 class GateCollector(BaseExchangeCollector):
     exchange_name: str = "gate"
 
-    # Map unified symbols to Gate.io symbols
-    UNIFIED_TO_EXCHANGE = {
-        "BTCUSDT-PERPETUAL": "BTC_USDT",
-        "ETHUSDT-PERPETUAL": "ETH_USDT",
-        "BTCUSD-PERPETUAL": "BTC_USD"
-    }
-    EXCHANGE_TO_UNIFIED = {v: k for k, v in UNIFIED_TO_EXCHANGE.items()}
-    # WS routing is hard-wired to the usdt / btc settle endpoints, so unmapped symbols cannot work
-    STRICT_SYMBOL_MAPPING = True
-
     def __init__(
         self,
         writer: MarketDataWriter,
@@ -36,15 +26,10 @@ class GateCollector(BaseExchangeCollector):
         btc_ws_url: str = GATE_BTC_WS_URL,
         rest_url: str = GATE_REST_URL
     ):
-        self.mapped_symbols = self.map_target_symbols(target_symbols)
-        super().__init__(writer, self.mapped_symbols, rest_rate_limit_rps, rest_poll_interval_ms)
+        super().__init__(writer, target_symbols, rest_rate_limit_rps, rest_poll_interval_ms)
         self.usdt_ws_url = usdt_ws_url
         self.btc_ws_url = btc_ws_url
         self.rest_url = rest_url
-
-    def to_unified_symbol(self, exchange_symbol: str) -> str:
-        """Convert exchange symbol back to unified symbol."""
-        return self.EXCHANGE_TO_UNIFIED.get(exchange_symbol, exchange_symbol)
 
     def get_settle(self, symbol: str) -> str:
         """Determine settlement currency for REST / WS routing."""
@@ -182,11 +167,10 @@ class GateCollector(BaseExchangeCollector):
                         if len(parts) > 1 and parts[0] in ["1s", "10s", "1m", "5m", "15m", "30m", "1h", "4h", "1d"]:
                             exchange_symbol = parts[1]
 
-                    unified_symbol = self.to_unified_symbol(exchange_symbol)
                     ts = int(candle.get("t", 0)) * 1000
                     await self.writer.write(
                         exchange=self.exchange_name,
-                        symbol=unified_symbol,
+                        symbol=exchange_symbol,
                         market_type="futures",
                         category="kline_1m",
                         record={
@@ -209,7 +193,6 @@ class GateCollector(BaseExchangeCollector):
                     exchange_symbol = trade.get("contract") or trade.get("s") or trade.get("n")
                     if not exchange_symbol:
                         continue
-                    unified_symbol = self.to_unified_symbol(exchange_symbol)
                     ts = int(trade.get("create_time_ms") or (trade.get("create_time", 0) * 1000))
                     
                     # Gate size sign indicates trade direction:
@@ -220,7 +203,7 @@ class GateCollector(BaseExchangeCollector):
 
                     await self.writer.write(
                         exchange=self.exchange_name,
-                        symbol=unified_symbol,
+                        symbol=exchange_symbol,
                         market_type="futures",
                         category="trades",
                         record={
@@ -238,7 +221,6 @@ class GateCollector(BaseExchangeCollector):
                 exchange_symbol = result.get("contract") or result.get("s") or result.get("n")
                 if not exchange_symbol:
                     return
-                unified_symbol = self.to_unified_symbol(exchange_symbol)
                 ts = result.get("t") or int(msg.get("time_ms", 0))
                 
                 bids = self._parse_bids_asks(result.get("bids", []))
@@ -246,7 +228,7 @@ class GateCollector(BaseExchangeCollector):
                 
                 await self.writer.write(
                     exchange=self.exchange_name,
-                    symbol=unified_symbol,
+                    symbol=exchange_symbol,
                     market_type="futures",
                     category="depth",
                     record={
@@ -263,12 +245,11 @@ class GateCollector(BaseExchangeCollector):
                 exchange_symbol = result.get("contract") or result.get("s") or result.get("n")
                 if not exchange_symbol:
                     return
-                unified_symbol = self.to_unified_symbol(exchange_symbol)
                 ts = result.get("t") or int(msg.get("time_ms", 0))
                 
                 await self.writer.write(
                     exchange=self.exchange_name,
-                    symbol=unified_symbol,
+                    symbol=exchange_symbol,
                     market_type="futures",
                     category="bbo",
                     record={
@@ -285,10 +266,9 @@ class GateCollector(BaseExchangeCollector):
         except Exception as e:
             self.logger.error(f"Error parsing Gate.io WS message: {e}", exc_info=True)
 
-    async def _fetch_and_write_rest_orderbook(self, symbol: str):
+    async def _fetch_and_write_rest(self, symbol: str):
         """Fetch depth from Gate.io REST API and write to storage."""
         settle = self.get_settle(symbol)
-        unified_symbol = self.to_unified_symbol(symbol)
         
         # Endpoint: GET /futures/{settle}/order_book
         depth_url = f"{self.rest_url}/futures/{settle}/order_book"
@@ -309,7 +289,7 @@ class GateCollector(BaseExchangeCollector):
 
             await self.writer.write(
                 exchange=self.exchange_name,
-                symbol=unified_symbol,
+                symbol=symbol,
                 market_type="futures",
                 category="orderbook_rest",
                 record={

@@ -41,7 +41,7 @@ graph TD
 
 ### Key Design Pillars:
 1. **Abstracted Collector Core**: Uses a modular, inherited design (`BaseExchangeCollector`) that implements generalized WebSocket handling, connection recovery with exponential backoff, and REST polling.
-2. **Unified Symbols & Output**: Translates exchange-specific symbols (e.g., `BTC_USDT`, `BTC-USDT-PERP`, `BTCUSDT`) into a standard unified scheme (`BTCUSDT-PERPETUAL`) for storage, ensuring downstream consumers get identical data shapes regardless of the source exchange.
+2. **Config as the Single Symbol Source**: Each exchange's target symbols are listed in `config.py` / env vars using that exchange's *native* names (e.g. Bitget `BTCUSDT`, Gate.io `BTC_USDT`, HashKey `BTCUSDT-PERPETUAL`). They are used verbatim for subscriptions, REST polling and the output folder names; collectors perform no symbol translation.
 3. **Fault Tolerance & Self-Healing**: Connections use robust reconnection loops with exponential backoff.
 4. **Rate Limit & IP Block Protection**: Incorporates an `AsyncRateLimiter` to keep REST queries under the official API limits for each exchange. It also detects HTTP 429 errors and automatically enforces a global 60-second backoff across polling coroutines.
 5. **Data Integrity**: File writes are **line-buffered** (`buffering=1`). In the event of a system or container crash, data is already committed to disk and will not be lost.
@@ -74,12 +74,12 @@ The zipped file uploaded to S3 contains the following program-friendly nested hi
     │   │       └── ...
     │   └── ...
     ├── bitget/
-    │   ├── BTCUSDT-PERPETUAL/
+    │   ├── BTCUSDT/
     │   │   └── futures/
     │   │       └── ...
     │   └── ...
     └── gate/
-        ├── BTCUSDT-PERPETUAL/
+        ├── BTC_USDT/
         │   └── futures/
         │       └── ...
         └── ...
@@ -212,11 +212,18 @@ Current funding rate per perpetual, polled sequentially via `GET /api/v2/futures
 
 ---
 
+### OSL (API v5)
+
+OSL is collected from the v5 public API (IP limit: 1800 weight/min at 1 weight per call, so the default `OSL_REST_RATE_LIMIT_RPS=2.0` is well inside it): WS `ticker` -> `bbo`, `books15` -> `depth`, `trade` -> `trades`,
+and REST `/kline` -> `kline_1m_rest`. All OSL data is `spot`. See [ADR 0003](docs/adr/0003-osl-v5-collector.md).
+
+---
+
 ## 🛠️ Configuration (.env)
 
 Adjust parameters by copying `.env.example` to `.env` or setting system environment variables.
 
-Symbol lists, strict/pass-through mapping and the HashKey site naming are explained in [ADR 0001](docs/adr/0001-per-exchange-symbols-and-hashkey-site-naming.md).
+Symbols are exchange-native and used verbatim ([ADR 0002](docs/adr/0002-config-is-the-single-symbol-source.md)); the HashKey site naming is in [ADR 0001](docs/adr/0001-per-exchange-symbols-and-hashkey-site-naming.md).
 
 | Key | Description | Default |
 |---|---|---|
@@ -226,11 +233,12 @@ Symbol lists, strict/pass-through mapping and the HashKey site naming are explai
 | `LOCAL_DATA_DIR` | Directory on disk where raw data is temporarily cached | `./local_cache` |
 | `UPLOAD_DELAY_MINUTES` | Wait minutes after UTC midnight before archiving the past day | `5` |
 | `HASHKEY_GLOBAL_TARGET_SYMBOLS` | Comma-separated target symbols for Hashkey Global (`hashkey_global`). Falls back to legacy `HASHKEY_TARGET_SYMBOLS` | `BTCUSDT-PERPETUAL,ETHUSDT-PERPETUAL,BTCUSD-PERPETUAL` |
-| `HASHKEY_HK_TARGET_SYMBOLS` | Comma-separated target symbols for Hashkey HK (`hashkey`) | `BTCUSDT-PERPETUAL,ETHUSDT-PERPETUAL,BTCUSD-PERPETUAL,BTCUSD,BTCUSDT,ETHUSD,ETHUSDT,SOLUSD,AVAXUSD,XRPUSD,LINKUSD,ARBUSD` |
-| `HASHKEY_MENA_TARGET_SYMBOLS` | Comma-separated target symbols for Hashkey MENA (`hashkey_mena`) | `BTCUSDT-PERPETUAL,ETHUSDT-PERPETUAL,SKHYNIXUSDT-PERPETUAL,QQQUSDT-PERPETUAL,SPCXUSDT-PERPETUAL,SOXLUSDT-PERPETUAL,USDTUSDC` |
-| `BITGET_TARGET_SYMBOLS` | Comma-separated target symbols for Bitget. Unsupported symbols are ignored with a warning | `BTCUSDT-PERPETUAL,ETHUSDT-PERPETUAL,BTCUSD-PERPETUAL` |
-| `GATE_TARGET_SYMBOLS` | Comma-separated target symbols for Gate.io. Unsupported symbols are ignored with a warning | `BTCUSDT-PERPETUAL,ETHUSDT-PERPETUAL,BTCUSD-PERPETUAL` |
-| `OSL_TARGET_SYMBOLS` | Comma-separated target symbols for OSL (several unified names map to `BTCUSDC`; duplicates are collapsed) | `BTCUSDC,USDTUSD` |
+| `HASHKEY_HK_TARGET_SYMBOLS` | Comma-separated HashKey-native target symbols for Hashkey HK (`hashkey`) | `BTCUSD,BTCUSDT,ETHUSD,ETHUSDT,SOLUSD,AVAXUSD,XRPUSD,LINKUSD,ARBUSD,USDTUSD,USDTHKD` |
+| `HASHKEY_MENA_TARGET_SYMBOLS` | Comma-separated HashKey-native target symbols for Hashkey MENA (`hashkey_mena`) | `BTCUSDT-PERPETUAL,ETHUSDT-PERPETUAL,SKHYNIXUSDT-PERPETUAL,QQQUSDT-PERPETUAL,SPCXUSDT-PERPETUAL,SOXLUSDT-PERPETUAL,USDTUSDC,USDTAED` |
+| `BITGET_TARGET_SYMBOLS` | Comma-separated Bitget instIds (`BTCUSD` is routed to COIN-FUTURES, everything else to USDT-FUTURES) | `BTCUSDT,ETHUSDT` |
+| `GATE_TARGET_SYMBOLS` | Comma-separated Gate.io contract names (`BTC_USD` uses the btc settle endpoint, others usdt) | `BTC_USDT,ETH_USDT,BTC_USD` |
+| `OSL_TARGET_SYMBOLS` | Comma-separated OSL v5 spot symbols (`BTCUSDC` does not exist on v5). Unknown symbols produce no WS data and REST kline errors | `BTCUSD,USDTUSD` |
+| `OSL_WS_URL` / `OSL_REST_URL` | OSL v5 public WebSocket and REST base URL (REST polling reads `/kline`) | `wss://stream-hk.osl.com/ws/v5/public` / `https://trade-hk.osl.com/api/v5` |
 | `HASHKEY_GLOBAL_WS_URL` / `HASHKEY_GLOBAL_REST_URL` | Hashkey Global endpoints. Fall back to legacy `HASHKEY_WS_URL` / `HASHKEY_REST_URL` | `wss://stream-glb.hashkey.com/quote/ws/v2` / `https://api-glb.hashkey.com` |
 | `HASHKEY_GLOBAL_REST_POLL_INTERVAL_MS` | Frequency of Hashkey Global REST depth requests in milliseconds. Falls back to legacy `HASHKEY_REST_POLL_INTERVAL_MS` | `200` |
 | `HASHKEY_GLOBAL_REST_RATE_LIMIT_RPS` | Global safety cap of requests per second for Hashkey Global REST queries. Falls back to legacy `HASHKEY_REST_RATE_LIMIT_RPS` | `1.5` |
