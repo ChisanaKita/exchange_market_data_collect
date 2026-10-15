@@ -39,10 +39,7 @@ def _parse_symbol_list(env_var_name: str, default: list) -> list:
 # 1a. Hashkey Global
 HASHKEY_GLOBAL_TARGET_SYMBOLS = _parse_symbol_list(
     "HASHKEY_GLOBAL_TARGET_SYMBOLS",
-    _parse_symbol_list(
-        "HASHKEY_TARGET_SYMBOLS",
-        ["BTCUSDT-PERPETUAL", "ETHUSDT-PERPETUAL", "BTCUSD-PERPETUAL"],
-    ),
+    ["BTCUSDT-PERPETUAL", "ETHUSDT-PERPETUAL", "BTCUSD-PERPETUAL"],
 )
 
 # 1b. Hashkey HK
