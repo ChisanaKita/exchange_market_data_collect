@@ -23,6 +23,8 @@ class GateCollector(BaseExchangeCollector):
         "BTCUSD-PERPETUAL": "BTC_USD"
     }
     EXCHANGE_TO_UNIFIED = {v: k for k, v in UNIFIED_TO_EXCHANGE.items()}
+    # WS routing is hard-wired to the usdt / btc settle endpoints, so unmapped symbols cannot work
+    STRICT_SYMBOL_MAPPING = True
 
     def __init__(
         self,
@@ -34,7 +36,7 @@ class GateCollector(BaseExchangeCollector):
         btc_ws_url: str = GATE_BTC_WS_URL,
         rest_url: str = GATE_REST_URL
     ):
-        self.mapped_symbols = [self.UNIFIED_TO_EXCHANGE.get(s, s) for s in target_symbols]
+        self.mapped_symbols = self.map_target_symbols(target_symbols)
         super().__init__(writer, self.mapped_symbols, rest_rate_limit_rps, rest_poll_interval_ms)
         self.usdt_ws_url = usdt_ws_url
         self.btc_ws_url = btc_ws_url

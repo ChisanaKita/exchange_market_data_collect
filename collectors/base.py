@@ -30,6 +30,30 @@ class AsyncRateLimiter:
 class BaseExchangeCollector:
     exchange_name: str = "base"
 
+    # Unified -> exchange-native symbol map, defined by each exchange collector.
+    UNIFIED_TO_EXCHANGE: Dict[str, str] = {}
+    # True: symbols missing from UNIFIED_TO_EXCHANGE are dropped with a warning.
+    # False: they are passed through unchanged as exchange-native symbols.
+    STRICT_SYMBOL_MAPPING: bool = False
+
+    @classmethod
+    def map_target_symbols(cls, target_symbols: List[str]) -> List[str]:
+        """Normalize configured symbols to exchange-native ones: upper-cased, mapped, de-duplicated."""
+        mapped: List[str] = []
+        for raw in target_symbols:
+            symbol = raw.strip().upper()
+            exchange_symbol = cls.UNIFIED_TO_EXCHANGE.get(symbol)
+            if exchange_symbol is None:
+                if cls.STRICT_SYMBOL_MAPPING:
+                    logging.getLogger(cls.__name__).warning(
+                        f"Ignoring unsupported symbol '{raw}'. Supported: {sorted(cls.UNIFIED_TO_EXCHANGE)}"
+                    )
+                    continue
+                exchange_symbol = symbol
+            if exchange_symbol not in mapped:
+                mapped.append(exchange_symbol)
+        return mapped
+
     def __init__(
         self,
         writer: MarketDataWriter,

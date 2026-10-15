@@ -14,13 +14,15 @@ HASHKEY_GLOBAL_REST_URL = "https://api-glb.hashkey.com"
 HASHKEY_HK_WS_URL = "wss://stream-pro.hashkey.com/quote/ws/v2"
 HASHKEY_HK_REST_URL = "https://api-pro.hashkey.com"
 
-# Default aliases
-HASHKEY_WS_URL = HASHKEY_GLOBAL_WS_URL
-HASHKEY_REST_URL = HASHKEY_GLOBAL_REST_URL
-
 
 class HashkeyCollector(BaseExchangeCollector):
-    exchange_name: str = "hashkey_global"
+    """Shared WS/REST logic for all HashKey sites.
+
+    Not instantiated directly: use HashkeyGlobalCollector, HashkeyHkCollector or
+    HashkeyMenaCollector, each of which sets its own exchange_name and site parameters.
+    Symbols outside UNIFIED_TO_EXCHANGE are passed through as exchange-native symbols,
+    since the HK and MENA sites list many spot pairs beyond the perpetuals mapped here.
+    """
 
     UNIFIED_TO_EXCHANGE = {
         "BTCUSDT-PERPETUAL": "BTCUSDT-PERPETUAL",
@@ -43,7 +45,7 @@ class HashkeyCollector(BaseExchangeCollector):
         ws_url: str = HASHKEY_GLOBAL_WS_URL,
         rest_url: str = HASHKEY_GLOBAL_REST_URL
     ):
-        self.mapped_symbols = [self.UNIFIED_TO_EXCHANGE.get(s, s) for s in target_symbols]
+        self.mapped_symbols = self.map_target_symbols(target_symbols)
         super().__init__(writer, self.mapped_symbols, rest_rate_limit_rps, rest_poll_interval_ms)
         self.ws_url = ws_url
         self.rest_url = rest_url
@@ -57,33 +59,6 @@ class HashkeyCollector(BaseExchangeCollector):
     def get_market_type(symbol: str) -> str:
         return "futures" if "PERPETUAL" in symbol else "spot"
 
-
-class HashkeyGlobalCollector(HashkeyCollector):
-    exchange_name: str = "hashkey_global"
-
-
-class HashkeyHkCollector(HashkeyCollector):
-    exchange_name: str = "hashkey_hk"
-    WS_SUBSCRIBE_EXTRA = {"site": "HK"}
-    REST_EXTRA_PARAMS = {"site": "HK"}
-
-    def __init__(
-        self,
-        writer: MarketDataWriter,
-        target_symbols: List[str],
-        rest_rate_limit_rps: float = 1.5,
-        rest_poll_interval_ms: int = 200,
-        ws_url: str = HASHKEY_HK_WS_URL,
-        rest_url: str = HASHKEY_HK_REST_URL
-    ):
-        super().__init__(
-            writer=writer,
-            target_symbols=target_symbols,
-            rest_rate_limit_rps=rest_rate_limit_rps,
-            rest_poll_interval_ms=rest_poll_interval_ms,
-            ws_url=ws_url,
-            rest_url=rest_url
-        )
 
     def _start_ws_tasks(self) -> List[asyncio.Task]:
         """Start the WebSocket loop."""
@@ -252,3 +227,32 @@ class HashkeyHkCollector(HashkeyCollector):
                     "raw": raw_data
                 }
             )
+
+
+class HashkeyGlobalCollector(HashkeyCollector):
+    exchange_name: str = "hashkey_global"
+
+
+class HashkeyHkCollector(HashkeyCollector):
+    # Keeps the historical "hashkey" name, so output paths and the `exchange` field stay stable.
+    exchange_name: str = "hashkey"
+    WS_SUBSCRIBE_EXTRA = {"site": "HK"}
+    REST_EXTRA_PARAMS = {"site": "HK"}
+
+    def __init__(
+        self,
+        writer: MarketDataWriter,
+        target_symbols: List[str],
+        rest_rate_limit_rps: float = 1.5,
+        rest_poll_interval_ms: int = 200,
+        ws_url: str = HASHKEY_HK_WS_URL,
+        rest_url: str = HASHKEY_HK_REST_URL
+    ):
+        super().__init__(
+            writer=writer,
+            target_symbols=target_symbols,
+            rest_rate_limit_rps=rest_rate_limit_rps,
+            rest_poll_interval_ms=rest_poll_interval_ms,
+            ws_url=ws_url,
+            rest_url=rest_url
+        )

@@ -37,7 +37,7 @@ class OSLCollector(BaseExchangeCollector):
         rest_rate_limit_rps: float = 2.0,
         rest_poll_interval_ms: int = 200
     ):
-        self.mapped_symbols = [self.UNIFIED_TO_EXCHANGE.get(s, s) for s in target_symbols]
+        self.mapped_symbols = self.map_target_symbols(target_symbols)
         super().__init__(writer, self.mapped_symbols, rest_rate_limit_rps, rest_poll_interval_ms)
         self.api_key = api_key
         self.api_secret = api_secret

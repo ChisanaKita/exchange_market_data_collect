@@ -14,7 +14,6 @@ from collectors import (
     OSLCollector
 )
 from config import (
-    TARGET_SYMBOLS,
     HASHKEY_GLOBAL_TARGET_SYMBOLS,
     HASHKEY_HK_TARGET_SYMBOLS,
     HASHKEY_MENA_TARGET_SYMBOLS,

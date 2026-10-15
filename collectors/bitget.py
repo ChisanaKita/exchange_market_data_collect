@@ -22,6 +22,8 @@ class BitgetCollector(BaseExchangeCollector):
         "BTCUSD-PERPETUAL": "BTCUSD"
     }
     EXCHANGE_TO_UNIFIED = {v: k for k, v in UNIFIED_TO_EXCHANGE.items()}
+    # WS/REST routing is hard-wired to USDT-FUTURES / COIN-FUTURES, so unmapped symbols cannot work
+    STRICT_SYMBOL_MAPPING = True
 
     def __init__(
         self,
@@ -32,7 +34,7 @@ class BitgetCollector(BaseExchangeCollector):
         ws_url: str = BITGET_WS_URL,
         rest_url: str = BITGET_REST_URL
     ):
-        self.mapped_symbols = [self.UNIFIED_TO_EXCHANGE.get(s, s) for s in target_symbols]
+        self.mapped_symbols = self.map_target_symbols(target_symbols)
         super().__init__(writer, self.mapped_symbols, rest_rate_limit_rps, rest_poll_interval_ms)
         self.ws_url = ws_url
         self.rest_url = rest_url

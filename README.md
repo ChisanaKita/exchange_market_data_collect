@@ -57,7 +57,7 @@ The zipped file uploaded to S3 contains the following program-friendly nested hi
 ```text
 20260618.zip (1 calendar day, UTC)
 └── 20260618/
-    ├── hashkey/
+    ├── hashkey/            # HashKey Hong Kong (site=HK)
     │   ├── BTCUSDT-PERPETUAL/
     │   │   └── futures/
     │   │       ├── kline_1m.jsonl
@@ -66,6 +66,8 @@ The zipped file uploaded to S3 contains the following program-friendly nested hi
     │   │       ├── bbo.jsonl
     │   │       └── orderbook_rest.jsonl
     │   └── ...
+    ├── hashkey_global/     # HashKey Global (same layout)
+    ├── hashkey_mena/       # HashKey MENA / UAE (same layout, plus funding_rate.jsonl)
     ├── bullish/
     │   ├── BTCUSDT-PERPETUAL/
     │   │   └── futures/
@@ -94,7 +96,7 @@ Every line in the `.jsonl` file is a valid self-contained JSON object. All files
 {
   "timestamp": 1781568000000,
   "datetime": "2026-06-18T16:00:00.000000Z",
-  "exchange": "hashkey", // or "bullish", "bitget", "gate"
+  "exchange": "hashkey", // HK; or "hashkey_global", "hashkey_mena", "bitget", "gate", "osl"
   "symbol": "BTCUSDT-PERPETUAL",
   "market_type": "futures",
   "category": "<stream_category>"
@@ -214,6 +216,8 @@ Current funding rate per perpetual, polled sequentially via `GET /api/v2/futures
 
 Adjust parameters by copying `.env.example` to `.env` or setting system environment variables.
 
+Symbol lists, strict/pass-through mapping and the HashKey site naming are explained in [ADR 0001](docs/adr/0001-per-exchange-symbols-and-hashkey-site-naming.md).
+
 | Key | Description | Default |
 |---|---|---|
 | `S3_BUCKET_NAME` | S3 bucket where zipped archives will be uploaded | `your-market-data-bucket` |
@@ -221,14 +225,19 @@ Adjust parameters by copying `.env.example` to `.env` or setting system environm
 | `S3_PREFIX` | S3 folder prefix where day packages are stored | `crypto-market-data/` |
 | `LOCAL_DATA_DIR` | Directory on disk where raw data is temporarily cached | `./local_cache` |
 | `UPLOAD_DELAY_MINUTES` | Wait minutes after UTC midnight before archiving the past day | `5` |
-| `HASHKEY_GLOBAL_TARGET_SYMBOLS` | Comma-separated target symbols for Hashkey Global collector | `BTCUSDT-PERPETUAL,ETHUSDT-PERPETUAL,BTCUSD-PERPETUAL` |
-| `HASHKEY_HK_TARGET_SYMBOLS` | Comma-separated target symbols for Hashkey HK collector | `BTCUSDT-PERPETUAL,ETHUSDT-PERPETUAL,BTCUSD-PERPETUAL,BTCUSD,BTCUSDT...` |
-| `HASHKEY_MENA_TARGET_SYMBOLS` | Comma-separated target symbols for Hashkey MENA collector | `BTCUSDT-PERPETUAL,ETHUSDT-PERPETUAL,SKHYNIXUSDT-PERPETUAL,QQQUSDT-PERPETUAL,SPCXUSDT-PERPETUAL,SOXLUSDT-PERPETUAL,USDTUSDC` |
-| `BITGET_TARGET_SYMBOLS` | Comma-separated target symbols for Bitget collector | `BTCUSDT-PERPETUAL,ETHUSDT-PERPETUAL,BTCUSD-PERPETUAL` |
-| `GATE_TARGET_SYMBOLS` | Comma-separated target symbols for Gate.io collector | `BTCUSDT-PERPETUAL,ETHUSDT-PERPETUAL,BTCUSD-PERPETUAL` |
-| `OSL_TARGET_SYMBOLS` | Comma-separated target symbols for OSL collector | `BTCUSDC,USDTUSD` |
-| `HASHKEY_REST_POLL_INTERVAL_MS` | Frequency of Hashkey REST depth requests in milliseconds | `200` |
-| `HASHKEY_REST_RATE_LIMIT_RPS` | Global safety cap of requests per second for Hashkey REST queries | `1.5` |
+| `HASHKEY_GLOBAL_TARGET_SYMBOLS` | Comma-separated target symbols for Hashkey Global (`hashkey_global`). Falls back to legacy `HASHKEY_TARGET_SYMBOLS` | `BTCUSDT-PERPETUAL,ETHUSDT-PERPETUAL,BTCUSD-PERPETUAL` |
+| `HASHKEY_HK_TARGET_SYMBOLS` | Comma-separated target symbols for Hashkey HK (`hashkey`) | `BTCUSDT-PERPETUAL,ETHUSDT-PERPETUAL,BTCUSD-PERPETUAL,BTCUSD,BTCUSDT,ETHUSD,ETHUSDT,SOLUSD,AVAXUSD,XRPUSD,LINKUSD,ARBUSD` |
+| `HASHKEY_MENA_TARGET_SYMBOLS` | Comma-separated target symbols for Hashkey MENA (`hashkey_mena`) | `BTCUSDT-PERPETUAL,ETHUSDT-PERPETUAL,SKHYNIXUSDT-PERPETUAL,QQQUSDT-PERPETUAL,SPCXUSDT-PERPETUAL,SOXLUSDT-PERPETUAL,USDTUSDC` |
+| `BITGET_TARGET_SYMBOLS` | Comma-separated target symbols for Bitget. Unsupported symbols are ignored with a warning | `BTCUSDT-PERPETUAL,ETHUSDT-PERPETUAL,BTCUSD-PERPETUAL` |
+| `GATE_TARGET_SYMBOLS` | Comma-separated target symbols for Gate.io. Unsupported symbols are ignored with a warning | `BTCUSDT-PERPETUAL,ETHUSDT-PERPETUAL,BTCUSD-PERPETUAL` |
+| `OSL_TARGET_SYMBOLS` | Comma-separated target symbols for OSL (several unified names map to `BTCUSDC`; duplicates are collapsed) | `BTCUSDC,USDTUSD` |
+| `HASHKEY_GLOBAL_WS_URL` / `HASHKEY_GLOBAL_REST_URL` | Hashkey Global endpoints. Fall back to legacy `HASHKEY_WS_URL` / `HASHKEY_REST_URL` | `wss://stream-glb.hashkey.com/quote/ws/v2` / `https://api-glb.hashkey.com` |
+| `HASHKEY_GLOBAL_REST_POLL_INTERVAL_MS` | Frequency of Hashkey Global REST depth requests in milliseconds. Falls back to legacy `HASHKEY_REST_POLL_INTERVAL_MS` | `200` |
+| `HASHKEY_GLOBAL_REST_RATE_LIMIT_RPS` | Global safety cap of requests per second for Hashkey Global REST queries. Falls back to legacy `HASHKEY_REST_RATE_LIMIT_RPS` | `1.5` |
+| `HASHKEY_HK_WS_URL` | Hashkey HK WebSocket URL (HK platform host; `site=HK` is sent on every subscription) | `wss://stream-pro.hashkey.com/quote/ws/v2` |
+| `HASHKEY_HK_REST_URL` | Hashkey HK REST base URL (`site=HK` is sent on every request) | `https://api-pro.hashkey.com` |
+| `HASHKEY_HK_REST_POLL_INTERVAL_MS` | Frequency of Hashkey HK REST depth requests in milliseconds | `200` |
+| `HASHKEY_HK_REST_RATE_LIMIT_RPS` | Global safety cap of requests per second for Hashkey HK REST queries. HK and MENA share one host/IP, so budget `HK + MENA` against the documented 5 rps query limit | `1.5` |
 | `HASHKEY_MENA_WS_URL` | Hashkey MENA (UAE) WebSocket URL (HK platform host; `site=MENA` is sent on every subscription) | `wss://stream-pro.hashkey.com/quote/ws/v2` |
 | `HASHKEY_MENA_REST_URL` | Hashkey MENA (UAE) REST base URL (HK platform host; `site=MENA` is sent on every request) | `https://api-pro.hashkey.com` |
 | `HASHKEY_MENA_REST_POLL_INTERVAL_MS` | Frequency of Hashkey MENA REST depth requests in milliseconds | `200` |

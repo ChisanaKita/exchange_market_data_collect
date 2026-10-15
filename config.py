@@ -23,20 +23,15 @@ UPLOAD_DELAY_MINUTES = int(os.getenv("UPLOAD_DELAY_MINUTES", "5"))
 
 
 def _parse_symbol_list(env_var_name: str, default: list) -> list:
+    """Read a comma-separated symbol list; upper-cased and de-duplicated, order preserved."""
     raw = os.getenv(env_var_name)
-    if raw:
-        return [s.strip() for s in raw.split(",") if s.strip()]
-    return list(default)
-
-
-# General target symbol baseline (used as default fallback)
-TARGET_SYMBOLS = [
-    "BTCUSDT-PERPETUAL",
-    "ETHUSDT-PERPETUAL",
-    "BTCUSD-PERPETUAL",
-    "BTCUSDC",
-    "USDTUSDC",
-]
+    items = raw.split(",") if raw else default
+    symbols = []
+    for item in items:
+        symbol = item.strip().upper()
+        if symbol and symbol not in symbols:
+            symbols.append(symbol)
+    return symbols
 
 # Per-exchange fine-grained target symbol lists
 # 1a. Hashkey Global
@@ -46,9 +41,6 @@ HASHKEY_GLOBAL_TARGET_SYMBOLS = _parse_symbol_list(
         "HASHKEY_TARGET_SYMBOLS",
         ["BTCUSDT-PERPETUAL", "ETHUSDT-PERPETUAL", "BTCUSD-PERPETUAL"],
     ),
-)
-HASHKEY_TARGET_SYMBOLS = (
-    HASHKEY_GLOBAL_TARGET_SYMBOLS  # Alias for backward compatibility
 )
 
 # 1b. Hashkey HK
@@ -102,7 +94,7 @@ OSL_TARGET_SYMBOLS = _parse_symbol_list("OSL_TARGET_SYMBOLS", ["BTCUSDC", "USDTU
 # Registry dictionary mapping exchange keys to target symbol lists
 EXCHANGE_TARGET_SYMBOLS = {
     "hashkey_global": HASHKEY_GLOBAL_TARGET_SYMBOLS,
-    "hashkey_hk": HASHKEY_HK_TARGET_SYMBOLS,
+    "hashkey": HASHKEY_HK_TARGET_SYMBOLS,
     "hashkey_mena": HASHKEY_MENA_TARGET_SYMBOLS,
     "bitget": BITGET_TARGET_SYMBOLS,
     "gate": GATE_TARGET_SYMBOLS,
@@ -133,11 +125,7 @@ HASHKEY_GLOBAL_REST_RATE_LIMIT_RPS = float(
     )
 )
 
-# Backward compatibility aliases
-HASHKEY_WS_URL = HASHKEY_GLOBAL_WS_URL
-HASHKEY_REST_URL = HASHKEY_GLOBAL_REST_URL
-HASHKEY_REST_POLL_INTERVAL_MS = HASHKEY_GLOBAL_REST_POLL_INTERVAL_MS
-HASHKEY_REST_RATE_LIMIT_RPS = HASHKEY_GLOBAL_REST_RATE_LIMIT_RPS
+# Legacy HASHKEY_* env vars (no site prefix) are still read above as fallbacks for Global.
 
 # 1b. Hashkey HK Settings — served from the HK platform hosts with site=HK
 HASHKEY_HK_WS_URL = os.getenv(

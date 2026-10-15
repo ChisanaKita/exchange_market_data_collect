@@ -108,7 +108,7 @@ class HashkeyMenaCollector(HashkeyCollector):
                 next_funding_time = entry.get("nextFundingTime")
                 await self.writer.write(
                     exchange=self.exchange_name,
-                    symbol=entry.get("symbol", symbol),
+                    symbol=self.to_unified_symbol(entry.get("symbol", symbol)),
                     market_type="futures",
                     category="funding_rate",
                     record={
