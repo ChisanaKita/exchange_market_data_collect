@@ -215,35 +215,37 @@ class BitgetCollector(BaseExchangeCollector):
 
     async def _fetch_and_write_rest(self, symbol: str):
         """Fetch depth from Bitget REST API and write to storage."""
-        # Endpoint: GET /api/v2/mix/market/depth
-        depth_url = f"{self.rest_url}/api/v2/mix/market/depth"
-        product_type = self.get_product_type(symbol)
-
+        # Endpoint: GET /api/v3/market/orderbook (20 req/s/IP)
+        depth_url = f"{self.rest_url}/api/v3/market/orderbook"
         params = {
+            "category": self.get_product_type(symbol),
             "symbol": symbol,
-            "productType": product_type,
             "limit": "20"
         }
 
         async with self.session.get(depth_url, params=params, timeout=5) as response:
-            raw_data = await response.json()
-            
-            # Bitget REST API V2 structure:
-            # {"code":"00000","msg":"success","requestTime":...,"data":{"bids":[...],"asks":[...],"ts":"...","seqNum":...}}
-            data = raw_data.get("data") or {}
-            bids = self._parse_bids_asks(data.get("bids", []))
-            asks = self._parse_bids_asks(data.get("asks", []))
-            ts = int(data.get("ts") or int(datetime.now(timezone.utc).timestamp() * 1000))
+            raw_data = await response.json(content_type=None)
 
-            await self.writer.write(
-                exchange=self.exchange_name,
-                symbol=symbol,
-                market_type="futures",
-                category="orderbook_rest",
-                record={
-                    "timestamp": ts,
-                    "bids": bids,
-                    "asks": asks,
-                    "raw": raw_data
-                }
-            )
+        # Bitget REST API V3 structure (asks under "a", bids under "b", both ascending/descending by price):
+        # {"code":"00000","msg":"success","requestTime":...,"data":{"a":[[price,size],...],"b":[[price,size],...],"ts":"..."}}
+        # Errors carry a non-"00000" code (e.g. 25100 "Trading pair ... does not exist") and `data: null`.
+        if raw_data.get("code") != "00000":
+            raise ValueError(f"Bitget orderbook request for {symbol} failed: {raw_data}")
+
+        data = raw_data.get("data") or {}
+        bids = self._parse_bids_asks(data.get("b", []))
+        asks = self._parse_bids_asks(data.get("a", []))
+        ts = int(data.get("ts") or int(datetime.now(timezone.utc).timestamp() * 1000))
+
+        await self.writer.write(
+            exchange=self.exchange_name,
+            symbol=symbol,
+            market_type="futures",
+            category="orderbook_rest",
+            record={
+                "timestamp": ts,
+                "bids": bids,
+                "asks": asks,
+                "raw": raw_data
+            }
+        )

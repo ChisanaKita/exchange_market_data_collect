@@ -232,7 +232,7 @@ Symbols are exchange-native and used verbatim ([ADR 0002](docs/adr/0002-config-i
 | `S3_PREFIX` | S3 folder prefix where day packages are stored | `crypto-market-data/` |
 | `LOCAL_DATA_DIR` | Directory on disk where raw data is temporarily cached | `./local_cache` |
 | `UPLOAD_DELAY_MINUTES` | Wait minutes after UTC midnight before archiving the past day | `5` |
-| `HASHKEY_GLOBAL_TARGET_SYMBOLS` | Comma-separated target symbols for Hashkey Global (`hashkey_global`). | `BTCUSDT-PERPETUAL,ETHUSDT-PERPETUAL,BTCUSD-PERPETUAL` |
+| `HASHKEY_GLOBAL_TARGET_SYMBOLS` | Comma-separated target symbols for Hashkey Global (`hashkey_global`). | `BTCUSDT-PERPETUAL,ETHUSDT-PERPETUAL` |
 | `HASHKEY_HK_TARGET_SYMBOLS` | Comma-separated HashKey-native target symbols for Hashkey HK (`hashkey`) | `BTCUSD,BTCUSDT,ETHUSD,ETHUSDT,SOLUSD,AVAXUSD,XRPUSD,LINKUSD,ARBUSD,USDTUSD,USDTHKD` |
 | `HASHKEY_MENA_TARGET_SYMBOLS` | Comma-separated HashKey-native target symbols for Hashkey MENA (`hashkey_mena`) | `BTCUSDT-PERPETUAL,ETHUSDT-PERPETUAL,SKHYNIXUSDT-PERPETUAL,QQQUSDT-PERPETUAL,SPCXUSDT-PERPETUAL,SOXLUSDT-PERPETUAL,USDTUSDC,USDTAED` |
 | `BITGET_TARGET_SYMBOLS` | Comma-separated Bitget instIds (`BTCUSD` is routed to COIN-FUTURES, everything else to USDT-FUTURES) | `BTCUSDT,ETHUSDT` |
