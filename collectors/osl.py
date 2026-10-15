@@ -37,9 +37,8 @@ class OSLCollector(BaseExchangeCollector):
         rest_rate_limit_rps: float = 2.0,
         rest_poll_interval_ms: int = 200
     ):
-        # Exclusively restrict OSL collector to BTC-PERP (BTCUSDC) and USDTUSD spot
-        target_osl_symbols = ["BTCUSDC", "USDTUSD"]
-        super().__init__(writer, target_osl_symbols, rest_rate_limit_rps, rest_poll_interval_ms)
+        self.mapped_symbols = [self.UNIFIED_TO_EXCHANGE.get(s, s) for s in target_symbols]
+        super().__init__(writer, self.mapped_symbols, rest_rate_limit_rps, rest_poll_interval_ms)
         self.api_key = api_key
         self.api_secret = api_secret
         self.ws_url = ws_url

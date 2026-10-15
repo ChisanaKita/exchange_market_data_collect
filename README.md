@@ -221,6 +221,12 @@ Adjust parameters by copying `.env.example` to `.env` or setting system environm
 | `S3_PREFIX` | S3 folder prefix where day packages are stored | `crypto-market-data/` |
 | `LOCAL_DATA_DIR` | Directory on disk where raw data is temporarily cached | `./local_cache` |
 | `UPLOAD_DELAY_MINUTES` | Wait minutes after UTC midnight before archiving the past day | `5` |
+| `HASHKEY_GLOBAL_TARGET_SYMBOLS` | Comma-separated target symbols for Hashkey Global collector | `BTCUSDT-PERPETUAL,ETHUSDT-PERPETUAL,BTCUSD-PERPETUAL` |
+| `HASHKEY_HK_TARGET_SYMBOLS` | Comma-separated target symbols for Hashkey HK collector | `BTCUSDT-PERPETUAL,ETHUSDT-PERPETUAL,BTCUSD-PERPETUAL,BTCUSD,BTCUSDT...` |
+| `HASHKEY_MENA_TARGET_SYMBOLS` | Comma-separated target symbols for Hashkey MENA collector | `BTCUSDT-PERPETUAL,ETHUSDT-PERPETUAL,SKHYNIXUSDT-PERPETUAL,QQQUSDT-PERPETUAL,SPCXUSDT-PERPETUAL,SOXLUSDT-PERPETUAL,USDTUSDC` |
+| `BITGET_TARGET_SYMBOLS` | Comma-separated target symbols for Bitget collector | `BTCUSDT-PERPETUAL,ETHUSDT-PERPETUAL,BTCUSD-PERPETUAL` |
+| `GATE_TARGET_SYMBOLS` | Comma-separated target symbols for Gate.io collector | `BTCUSDT-PERPETUAL,ETHUSDT-PERPETUAL,BTCUSD-PERPETUAL` |
+| `OSL_TARGET_SYMBOLS` | Comma-separated target symbols for OSL collector | `BTCUSDC,USDTUSD` |
 | `HASHKEY_REST_POLL_INTERVAL_MS` | Frequency of Hashkey REST depth requests in milliseconds | `200` |
 | `HASHKEY_REST_RATE_LIMIT_RPS` | Global safety cap of requests per second for Hashkey REST queries | `1.5` |
 | `HASHKEY_MENA_WS_URL` | Hashkey MENA (UAE) WebSocket URL (HK platform host; `site=MENA` is sent on every subscription) | `wss://stream-pro.hashkey.com/quote/ws/v2` |
@@ -228,8 +234,6 @@ Adjust parameters by copying `.env.example` to `.env` or setting system environm
 | `HASHKEY_MENA_REST_POLL_INTERVAL_MS` | Frequency of Hashkey MENA REST depth requests in milliseconds | `200` |
 | `HASHKEY_MENA_REST_RATE_LIMIT_RPS` | Global safety cap of requests per second for Hashkey MENA REST queries | `1.5` |
 | `HASHKEY_MENA_FUNDING_RATE_DELAY_MS` | Delay between sequential Hashkey MENA funding rate queries (one perpetual per query) | `500` |
-| `BULLISH_REST_POLL_INTERVAL_MS` | Frequency of Bullish REST depth requests in milliseconds | `200` |
-| `BULLISH_REST_RATE_LIMIT_RPS` | Global safety cap of requests per second for Bullish REST queries | `2.0` |
 | `BITGET_REST_POLL_INTERVAL_MS` | Frequency of Bitget REST depth requests in milliseconds | `200` |
 | `BITGET_REST_RATE_LIMIT_RPS` | Global safety cap of requests per second for Bitget REST queries | `2.0` |
 | `GATE_REST_POLL_INTERVAL_MS` | Frequency of Gate.io REST depth requests in milliseconds | `200` |

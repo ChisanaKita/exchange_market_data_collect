@@ -8,21 +8,29 @@ from collectors.base import BaseExchangeCollector
 from writer import MarketDataWriter
 
 # Default configurations if not overridden in constructor
-HASHKEY_WS_URL = "wss://stream-glb.hashkey.com/quote/ws/v2"
-HASHKEY_REST_URL = "https://api-glb.hashkey.com"
+HASHKEY_GLOBAL_WS_URL = "wss://stream-glb.hashkey.com/quote/ws/v2"
+HASHKEY_GLOBAL_REST_URL = "https://api-glb.hashkey.com"
+
+HASHKEY_HK_WS_URL = "wss://stream-pro.hashkey.com/quote/ws/v2"
+HASHKEY_HK_REST_URL = "https://api-pro.hashkey.com"
+
+# Default aliases
+HASHKEY_WS_URL = HASHKEY_GLOBAL_WS_URL
+HASHKEY_REST_URL = HASHKEY_GLOBAL_REST_URL
 
 
 class HashkeyCollector(BaseExchangeCollector):
-    exchange_name: str = "hashkey"
+    exchange_name: str = "hashkey_global"
 
     UNIFIED_TO_EXCHANGE = {
         "BTCUSDT-PERPETUAL": "BTCUSDT-PERPETUAL",
         "ETHUSDT-PERPETUAL": "ETHUSDT-PERPETUAL",
         "BTCUSD-PERPETUAL": "BTCUSD-PERPETUAL"
     }
+    EXCHANGE_TO_UNIFIED = {v: k for k, v in UNIFIED_TO_EXCHANGE.items()}
 
     # Extra fields merged into every WS subscription payload / REST query.
-    # Regional sites sharing one host (e.g. MENA on api-pro) use these to select the market site.
+    # Regional sites sharing one host (e.g. HK/MENA on api-pro) use these to select the market site.
     WS_SUBSCRIBE_EXTRA: Dict[str, str] = {}
     REST_EXTRA_PARAMS: Dict[str, str] = {}
 
@@ -32,17 +40,50 @@ class HashkeyCollector(BaseExchangeCollector):
         target_symbols: List[str],
         rest_rate_limit_rps: float = 1.5,
         rest_poll_interval_ms: int = 200,
-        ws_url: str = HASHKEY_WS_URL,
-        rest_url: str = HASHKEY_REST_URL
+        ws_url: str = HASHKEY_GLOBAL_WS_URL,
+        rest_url: str = HASHKEY_GLOBAL_REST_URL
     ):
-        self.mapped_symbols = [self.UNIFIED_TO_EXCHANGE[s] for s in target_symbols if s in self.UNIFIED_TO_EXCHANGE]
+        self.mapped_symbols = [self.UNIFIED_TO_EXCHANGE.get(s, s) for s in target_symbols]
         super().__init__(writer, self.mapped_symbols, rest_rate_limit_rps, rest_poll_interval_ms)
         self.ws_url = ws_url
         self.rest_url = rest_url
 
+
+    def to_unified_symbol(self, exchange_symbol: str) -> str:
+        """Convert exchange symbol back to unified symbol."""
+        return self.EXCHANGE_TO_UNIFIED.get(exchange_symbol, exchange_symbol)
+
     @staticmethod
     def get_market_type(symbol: str) -> str:
         return "futures" if "PERPETUAL" in symbol else "spot"
+
+
+class HashkeyGlobalCollector(HashkeyCollector):
+    exchange_name: str = "hashkey_global"
+
+
+class HashkeyHkCollector(HashkeyCollector):
+    exchange_name: str = "hashkey_hk"
+    WS_SUBSCRIBE_EXTRA = {"site": "HK"}
+    REST_EXTRA_PARAMS = {"site": "HK"}
+
+    def __init__(
+        self,
+        writer: MarketDataWriter,
+        target_symbols: List[str],
+        rest_rate_limit_rps: float = 1.5,
+        rest_poll_interval_ms: int = 200,
+        ws_url: str = HASHKEY_HK_WS_URL,
+        rest_url: str = HASHKEY_HK_REST_URL
+    ):
+        super().__init__(
+            writer=writer,
+            target_symbols=target_symbols,
+            rest_rate_limit_rps=rest_rate_limit_rps,
+            rest_poll_interval_ms=rest_poll_interval_ms,
+            ws_url=ws_url,
+            rest_url=rest_url
+        )
 
     def _start_ws_tasks(self) -> List[asyncio.Task]:
         """Start the WebSocket loop."""
@@ -111,12 +152,13 @@ class HashkeyCollector(BaseExchangeCollector):
                 return
 
             market_type = self.get_market_type(symbol)
+            unified_symbol = self.to_unified_symbol(symbol)
 
             # 1. Handle Klines
             if topic == "kline":
                 await self.writer.write(
                     exchange=self.exchange_name,
-                    symbol=symbol,
+                    symbol=unified_symbol,
                     market_type=market_type,
                     category="kline_1m",
                     record={
@@ -136,7 +178,7 @@ class HashkeyCollector(BaseExchangeCollector):
             elif topic == "trade":
                 await self.writer.write(
                     exchange=self.exchange_name,
-                    symbol=symbol,
+                    symbol=unified_symbol,
                     market_type=market_type,
                     category="trades",
                     record={
@@ -155,7 +197,7 @@ class HashkeyCollector(BaseExchangeCollector):
                 asks = [[float(p), float(q)] for p, q in data.get("a", [])]
                 await self.writer.write(
                     exchange=self.exchange_name,
-                    symbol=symbol,
+                    symbol=unified_symbol,
                     market_type=market_type,
                     category="depth",
                     record={
@@ -171,7 +213,7 @@ class HashkeyCollector(BaseExchangeCollector):
             elif topic == "bbo":
                 await self.writer.write(
                     exchange=self.exchange_name,
-                    symbol=symbol,
+                    symbol=unified_symbol,
                     market_type=market_type,
                     category="bbo",
                     record={
@@ -200,7 +242,7 @@ class HashkeyCollector(BaseExchangeCollector):
 
             await self.writer.write(
                 exchange=self.exchange_name,
-                symbol=symbol,
+                symbol=self.to_unified_symbol(symbol),
                 market_type=self.get_market_type(symbol),
                 category="orderbook_rest",
                 record={

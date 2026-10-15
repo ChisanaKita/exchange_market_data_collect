@@ -28,6 +28,7 @@ class HashkeyMenaCollector(HashkeyCollector):
         "SOXLUSDT-PERPETUAL": "SOXLUSDT-PERPETUAL",
         "USDTUSDC": "USDTUSDC"
     }
+    EXCHANGE_TO_UNIFIED = {v: k for k, v in UNIFIED_TO_EXCHANGE.items()}
 
     WS_SUBSCRIBE_EXTRA = {"site": "MENA"}
     REST_EXTRA_PARAMS = {"site": "MENA"}

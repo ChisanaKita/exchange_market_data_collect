@@ -32,7 +32,7 @@ class BitgetCollector(BaseExchangeCollector):
         ws_url: str = BITGET_WS_URL,
         rest_url: str = BITGET_REST_URL
     ):
-        self.mapped_symbols = [self.UNIFIED_TO_EXCHANGE[s] for s in target_symbols if s in self.UNIFIED_TO_EXCHANGE]
+        self.mapped_symbols = [self.UNIFIED_TO_EXCHANGE.get(s, s) for s in target_symbols]
         super().__init__(writer, self.mapped_symbols, rest_rate_limit_rps, rest_poll_interval_ms)
         self.ws_url = ws_url
         self.rest_url = rest_url

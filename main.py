@@ -6,7 +6,8 @@ import signal
 from writer import MarketDataWriter
 from uploader import MarketDataUploader
 from collectors import (
-    HashkeyCollector,
+    HashkeyGlobalCollector,
+    HashkeyHkCollector,
     HashkeyMenaCollector,
     BitgetCollector,
     GateCollector,
@@ -14,11 +15,20 @@ from collectors import (
 )
 from config import (
     TARGET_SYMBOLS,
+    HASHKEY_GLOBAL_TARGET_SYMBOLS,
+    HASHKEY_HK_TARGET_SYMBOLS,
     HASHKEY_MENA_TARGET_SYMBOLS,
-    HASHKEY_WS_URL,
-    HASHKEY_REST_URL,
-    HASHKEY_REST_POLL_INTERVAL_MS,
-    HASHKEY_REST_RATE_LIMIT_RPS,
+    BITGET_TARGET_SYMBOLS,
+    GATE_TARGET_SYMBOLS,
+    OSL_TARGET_SYMBOLS,
+    HASHKEY_GLOBAL_WS_URL,
+    HASHKEY_GLOBAL_REST_URL,
+    HASHKEY_GLOBAL_REST_POLL_INTERVAL_MS,
+    HASHKEY_GLOBAL_REST_RATE_LIMIT_RPS,
+    HASHKEY_HK_WS_URL,
+    HASHKEY_HK_REST_URL,
+    HASHKEY_HK_REST_POLL_INTERVAL_MS,
+    HASHKEY_HK_REST_RATE_LIMIT_RPS,
     HASHKEY_MENA_WS_URL,
     HASHKEY_MENA_REST_URL,
     HASHKEY_MENA_REST_POLL_INTERVAL_MS,
@@ -76,13 +86,21 @@ class Application:
         
         # 2. Initialize all Exchange Collectors
         self.collectors = [
-            HashkeyCollector(
+            HashkeyGlobalCollector(
                 writer=self.writer,
-                target_symbols=TARGET_SYMBOLS,
-                rest_rate_limit_rps=HASHKEY_REST_RATE_LIMIT_RPS,
-                rest_poll_interval_ms=HASHKEY_REST_POLL_INTERVAL_MS,
-                ws_url=HASHKEY_WS_URL,
-                rest_url=HASHKEY_REST_URL
+                target_symbols=HASHKEY_GLOBAL_TARGET_SYMBOLS,
+                rest_rate_limit_rps=HASHKEY_GLOBAL_REST_RATE_LIMIT_RPS,
+                rest_poll_interval_ms=HASHKEY_GLOBAL_REST_POLL_INTERVAL_MS,
+                ws_url=HASHKEY_GLOBAL_WS_URL,
+                rest_url=HASHKEY_GLOBAL_REST_URL
+            ),
+            HashkeyHkCollector(
+                writer=self.writer,
+                target_symbols=HASHKEY_HK_TARGET_SYMBOLS,
+                rest_rate_limit_rps=HASHKEY_HK_REST_RATE_LIMIT_RPS,
+                rest_poll_interval_ms=HASHKEY_HK_REST_POLL_INTERVAL_MS,
+                ws_url=HASHKEY_HK_WS_URL,
+                rest_url=HASHKEY_HK_REST_URL
             ),
             HashkeyMenaCollector(
                 writer=self.writer,
@@ -95,7 +113,7 @@ class Application:
             ),
             BitgetCollector(
                 writer=self.writer,
-                target_symbols=TARGET_SYMBOLS,
+                target_symbols=BITGET_TARGET_SYMBOLS,
                 rest_rate_limit_rps=BITGET_REST_RATE_LIMIT_RPS,
                 rest_poll_interval_ms=BITGET_REST_POLL_INTERVAL_MS,
                 ws_url=BITGET_WS_URL,
@@ -103,7 +121,7 @@ class Application:
             ),
             GateCollector(
                 writer=self.writer,
-                target_symbols=TARGET_SYMBOLS,
+                target_symbols=GATE_TARGET_SYMBOLS,
                 rest_rate_limit_rps=GATE_REST_RATE_LIMIT_RPS,
                 rest_poll_interval_ms=GATE_REST_POLL_INTERVAL_MS,
                 usdt_ws_url=GATE_USDT_WS_URL,
@@ -112,7 +130,7 @@ class Application:
             ),
             OSLCollector(
                 writer=self.writer,
-                target_symbols=TARGET_SYMBOLS,
+                target_symbols=OSL_TARGET_SYMBOLS,
                 api_key=OSL_API_KEY,
                 api_secret=OSL_API_SECRET,
                 ws_url=OSL_WS_URL,
