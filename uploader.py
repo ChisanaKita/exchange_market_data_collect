@@ -193,9 +193,14 @@ class MarketDataUploader:
                 with os.fdopen(write_fd, "wb") as write_end:
                     counter = _CountingWriter(write_end)
                     with zipfile.ZipFile(counter, "w", zipfile.ZIP_DEFLATED, allowZip64=True) as archive:
-                        for file_path in sorted(p for p in day_dir.rglob("*") if p.is_file()):
-                            # The day directory is the archive root (e.g. 20260616/hashkey/...)
-                            archive.write(file_path, arcname=file_path.relative_to(day_dir.parent).as_posix())
+                        # Same layout and entry order as shutil.make_archive produced: the day directory is the
+                        # archive root (e.g. 20260616/hashkey/...), with an entry for every directory.
+                        archive.write(day_dir, day_dir.name)
+                        for dir_path, dir_names, file_names in os.walk(day_dir):
+                            dir_names.sort()
+                            for name in dir_names + sorted(file_names):
+                                entry = Path(dir_path) / name
+                                archive.write(entry, entry.relative_to(day_dir.parent).as_posix())
                     state["bytes"] = counter.bytes_written
             except BaseException as e:
                 state["error"] = e

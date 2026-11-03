@@ -15,7 +15,11 @@ written, so the upload failed on every hourly retry and the data that needed fre
 
 - The day directory is zipped on a thread straight into an OS pipe, and `upload_fileobj` reads the pipe
   as a multipart upload (64 MB parts). No temporary zip is written, so the upload needs no free disk.
-- Same S3 key and same archive layout as before (`<prefix>/YYYY/MM/DD/YYYYMMDD.zip`, rooted at the day folder).
+- Same S3 key and same archive layout as before (`<prefix>/YYYY/MM/DD/YYYYMMDD.zip`, rooted at the day folder,
+  with an entry for every directory including empty ones). Checked against the old `shutil.make_archive`
+  output: identical entry names, CRCs, sizes and extracted tree; only the entry order differs (the old order
+  followed the filesystem). A zip with a 4.5 GB member passes `unzip -t`. The streamed zip uses data
+  descriptors (it cannot seek back to fill in sizes), which `unzip` and Python read normally.
 - The local day directory is deleted only after `head_object` reports exactly the bytes the zip writer
   produced. If the zip writer fails midway, the reader raises at end of stream, so a truncated archive is
   never completed as an S3 object.
