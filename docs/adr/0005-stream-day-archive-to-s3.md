@@ -14,7 +14,7 @@ written, so the upload failed on every hourly retry and the data that needed fre
 ## Decision
 
 - The day directory is zipped on a thread straight into an OS pipe, and `upload_fileobj` reads the pipe
-  as a multipart upload (64 MB parts). No temporary zip is written, so the upload needs no free disk.
+  as a multipart upload (16 MB parts: at most 10 are buffered, about 160 MB of RAM, and the daily zip may reach 160 GB). No temporary zip is written, so the upload needs no free disk.
 - Same S3 key and same archive layout as before (`<prefix>/YYYY/MM/DD/YYYYMMDD.zip`, rooted at the day folder,
   with an entry for every directory including empty ones). Checked against the old `shutil.make_archive`
   output: identical entry names, CRCs, sizes and extracted tree; only the entry order differs (the old order

@@ -22,8 +22,9 @@ from config import (
 
 logger = logging.getLogger("MarketDataUploader")
 
-# Multipart part size for the streamed upload (a stream has no known size, and S3 allows at most 10000 parts)
-UPLOAD_PART_SIZE = 64 * 1024 * 1024
+# Multipart part size for the streamed upload. A stream has no known size and S3 allows at most 10000 parts
+# (16 MB parts -> up to 160 GB per day). boto3 buffers up to 10 parts in memory, so this also bounds RAM to ~160 MB.
+UPLOAD_PART_SIZE = 16 * 1024 * 1024
 
 
 class _CountingWriter:
