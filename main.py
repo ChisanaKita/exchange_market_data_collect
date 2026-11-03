@@ -11,7 +11,8 @@ from collectors import (
     HashkeyMenaCollector,
     BitgetCollector,
     GateCollector,
-    OSLCollector
+    OSLCollector,
+    PantherCollector
 )
 from config import (
     HASHKEY_GLOBAL_TARGET_SYMBOLS,
@@ -20,6 +21,7 @@ from config import (
     BITGET_TARGET_SYMBOLS,
     GATE_TARGET_SYMBOLS,
     OSL_TARGET_SYMBOLS,
+    PANTHER_TARGET_SYMBOLS,
     HASHKEY_GLOBAL_WS_URL,
     HASHKEY_GLOBAL_REST_URL,
     HASHKEY_GLOBAL_REST_POLL_INTERVAL_MS,
@@ -45,7 +47,14 @@ from config import (
     OSL_REST_URL,
     OSL_WS_URL,
     OSL_REST_POLL_INTERVAL_MS,
-    OSL_REST_RATE_LIMIT_RPS
+    OSL_REST_RATE_LIMIT_RPS,
+    PANTHER_WS_URL,
+    PANTHER_REST_URL,
+    PANTHER_API_KEY,
+    PANTHER_API_SECRET,
+    PANTHER_PASSPHRASE,
+    PANTHER_REST_POLL_INTERVAL_MS,
+    PANTHER_REST_RATE_LIMIT_RPS
 )
 
 
@@ -134,6 +143,26 @@ class Application:
                 rest_poll_interval_ms=OSL_REST_POLL_INTERVAL_MS
             )
         ]
+
+        # Panther needs credentials for every connection; without them skip it so the other exchanges still run
+        if PANTHER_API_KEY and PANTHER_API_SECRET and PANTHER_PASSPHRASE:
+            self.collectors.append(
+                PantherCollector(
+                    writer=self.writer,
+                    target_symbols=PANTHER_TARGET_SYMBOLS,
+                    api_key=PANTHER_API_KEY,
+                    api_secret=PANTHER_API_SECRET,
+                    passphrase=PANTHER_PASSPHRASE,
+                    ws_url=PANTHER_WS_URL,
+                    rest_url=PANTHER_REST_URL,
+                    rest_rate_limit_rps=PANTHER_REST_RATE_LIMIT_RPS,
+                    rest_poll_interval_ms=PANTHER_REST_POLL_INTERVAL_MS
+                )
+            )
+        else:
+            logger.warning(
+                "Panther collector disabled: set PANTHER_API_KEY, PANTHER_API_SECRET and PANTHER_PASSPHRASE to enable it."
+            )
 
         # 3. Setup Graceful Shutdown Signal Handlers
         self._setup_signal_handlers()

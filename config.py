@@ -90,6 +90,12 @@ GATE_TARGET_SYMBOLS = _parse_symbol_list(
 # 4. OSL
 OSL_TARGET_SYMBOLS = _parse_symbol_list("OSL_TARGET_SYMBOLS", ["BTCUSD", "USDTUSD"])
 
+# 5. Panther (PantherTrade, spot; symbols are BASE-QUOTE)
+PANTHER_TARGET_SYMBOLS = _parse_symbol_list(
+    "PANTHER_TARGET_SYMBOLS",
+    ["USDT-USD", "USDT-HKD", "BTC-USD", "ETH-USD"],
+)
+
 # Registry dictionary mapping exchange keys to target symbol lists
 EXCHANGE_TARGET_SYMBOLS = {
     "hashkey_global": HASHKEY_GLOBAL_TARGET_SYMBOLS,
@@ -98,6 +104,7 @@ EXCHANGE_TARGET_SYMBOLS = {
     "bitget": BITGET_TARGET_SYMBOLS,
     "gate": GATE_TARGET_SYMBOLS,
     "osl": OSL_TARGET_SYMBOLS,
+    "panther": PANTHER_TARGET_SYMBOLS,
 }
 
 # --- Connection Settings ---
@@ -174,3 +181,14 @@ OSL_REST_URL = os.getenv("OSL_REST_URL", "https://trade-hk.osl.com/api/v5")
 OSL_WS_URL = os.getenv("OSL_WS_URL", "wss://stream-hk.osl.com/ws/v5/public")
 OSL_REST_POLL_INTERVAL_MS = int(os.getenv("OSL_REST_POLL_INTERVAL_MS", "200"))
 OSL_REST_RATE_LIMIT_RPS = float(os.getenv("OSL_REST_RATE_LIMIT_RPS", "2.0"))
+
+# 6. Panther Settings. Every WS connection and REST request is authenticated, so credentials are required.
+# UAT: wss://ws-api-uat.panthertrade.com/v1 and https://web-api-uat.panthertrade.com (separate credentials).
+PANTHER_WS_URL = os.getenv("PANTHER_WS_URL", "wss://ws-api.panthertrade.com/v1")
+PANTHER_REST_URL = os.getenv("PANTHER_REST_URL", "https://web-api.panthertrade.com")
+PANTHER_API_KEY = os.getenv("PANTHER_API_KEY", "")
+PANTHER_API_SECRET = os.getenv("PANTHER_API_SECRET", "")
+PANTHER_PASSPHRASE = os.getenv("PANTHER_PASSPHRASE", "")
+PANTHER_REST_POLL_INTERVAL_MS = int(os.getenv("PANTHER_REST_POLL_INTERVAL_MS", "200"))
+# The documented limit is 2 rps/IP across all REST endpoints
+PANTHER_REST_RATE_LIMIT_RPS = float(os.getenv("PANTHER_REST_RATE_LIMIT_RPS", "1.5"))

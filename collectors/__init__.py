@@ -4,6 +4,7 @@ from collectors.hashkey_mena import HashkeyMenaCollector
 from collectors.bitget import BitgetCollector
 from collectors.gate import GateCollector
 from collectors.osl import OSLCollector
+from collectors.panther import PantherCollector
 
 __all__ = [
     "BaseExchangeCollector",
@@ -12,5 +13,6 @@ __all__ = [
     "HashkeyMenaCollector",
     "BitgetCollector",
     "GateCollector",
-    "OSLCollector"
+    "OSLCollector",
+    "PantherCollector"
 ]

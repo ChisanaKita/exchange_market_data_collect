@@ -96,7 +96,7 @@ Every line in the `.jsonl` file is a valid self-contained JSON object. All files
 {
   "timestamp": 1781568000000,
   "datetime": "2026-06-18T16:00:00.000000Z",
-  "exchange": "hashkey", // HK; or "hashkey_global", "hashkey_mena", "bitget", "gate", "osl"
+  "exchange": "hashkey", // HK; or "hashkey_global", "hashkey_mena", "bitget", "gate", "osl", "panther"
   "symbol": "BTCUSDT-PERPETUAL",
   "market_type": "futures",
   "category": "<stream_category>"
@@ -219,6 +219,14 @@ and REST `/kline` -> `kline_1m_rest`. All OSL data is `spot`. See [ADR 0003](doc
 
 ---
 
+### Panther (PantherTrade)
+
+Panther is a spot venue whose WS and REST are **both authenticated** (a read-only "View" key is enough, and the server IP must be whitelisted on the key). Without `PANTHER_API_KEY`, `PANTHER_API_SECRET` and `PANTHER_PASSPHRASE` the collector is skipped with a warning.
+WS `ticker` -> `bbo`, `trade` -> `trades`, `book` (depth 20, snapshot + deltas rebuilt into full books) -> `depth`; REST `/orderbook` -> `orderbook_rest` and `/ohlc` -> `kline_1m_rest` (closed candles only, polled once a minute).
+Symbols are `BASE-QUOTE` (`BTC-USD`). See [ADR 0004](docs/adr/0004-panther-collector.md).
+
+---
+
 ## 🛠️ Configuration (.env)
 
 Adjust parameters by copying `.env.example` to `.env` or setting system environment variables.
@@ -239,6 +247,10 @@ Symbols are exchange-native and used verbatim ([ADR 0002](docs/adr/0002-config-i
 | `GATE_TARGET_SYMBOLS` | Comma-separated Gate.io contract names (`BTC_USD` uses the btc settle endpoint, others usdt) | `BTC_USDT,ETH_USDT,BTC_USD` |
 | `OSL_TARGET_SYMBOLS` | Comma-separated OSL v5 spot symbols (`BTCUSDC` does not exist on v5). Unknown symbols produce no WS data and REST kline errors | `BTCUSD,USDTUSD` |
 | `OSL_WS_URL` / `OSL_REST_URL` | OSL v5 public WebSocket and REST base URL (REST polling reads `/kline`) | `wss://stream-hk.osl.com/ws/v5/public` / `https://trade-hk.osl.com/api/v5` |
+| `PANTHER_TARGET_SYMBOLS` | Comma-separated Panther spot symbols in `BASE-QUOTE` form | `USDT-USD,USDT-HKD,BTC-USD,ETH-USD` |
+| `PANTHER_API_KEY` / `PANTHER_API_SECRET` / `PANTHER_PASSPHRASE` | Panther API credentials (required; the collector is skipped if any is empty) | empty |
+| `PANTHER_WS_URL` / `PANTHER_REST_URL` | Panther WebSocket and REST base URL (UAT: `ws-api-uat` / `web-api-uat.panthertrade.com`, separate credentials) | `wss://ws-api.panthertrade.com/v1` / `https://web-api.panthertrade.com` |
+| `PANTHER_REST_POLL_INTERVAL_MS` / `PANTHER_REST_RATE_LIMIT_RPS` | REST poll interval and request cap. The documented limit is 2 rps/IP across all endpoints | `200` / `1.5` |
 | `HASHKEY_GLOBAL_WS_URL` / `HASHKEY_GLOBAL_REST_URL` | Hashkey Global endpoints. Fall back to legacy `HASHKEY_WS_URL` / `HASHKEY_REST_URL` | `wss://stream-glb.hashkey.com/quote/ws/v2` / `https://api-glb.hashkey.com` |
 | `HASHKEY_GLOBAL_REST_POLL_INTERVAL_MS` | Frequency of Hashkey Global REST depth requests in milliseconds. Falls back to legacy `HASHKEY_REST_POLL_INTERVAL_MS` | `200` |
 | `HASHKEY_GLOBAL_REST_RATE_LIMIT_RPS` | Global safety cap of requests per second for Hashkey Global REST queries. Falls back to legacy `HASHKEY_REST_RATE_LIMIT_RPS` | `1.5` |
