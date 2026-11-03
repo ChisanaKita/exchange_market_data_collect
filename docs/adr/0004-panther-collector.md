@@ -43,10 +43,19 @@ places, so the parser accepts both variants: channel `trade`/`trades`; `last_tra
 book `qty`/`quantity` (and `size` on REST); `prev_seq_id`/`pre_seq_id`. Open questions to confirm on the
 first live run:
 
-1. Whether the REST signature covers the query string. The code signs `ts + GET + path?query` (as in the
-   Coinbase and OKX APIs this one resembles). If REST returns signature errors, sign the bare path instead.
+1. ~~Whether the REST signature covers the query string.~~ Confirmed on the first live run: signing
+   `ts + GET + path?query` is accepted.
 2. Whether `prev_seq_id` chains cleanly on a depth-20 subscription; a false gap would cause a reconnect loop.
 3. Whether the `/ohlc` range is inclusive of a candle whose `close_time` equals the range end.
+
+## Live findings
+
+- REST responses are wrapped in an undocumented envelope,
+  `{"error_code": 0, "error_message": "", "details": <payload>}`. `_get_json` unwraps `details` and raises
+  on a non-zero `error_code`. The first live run logged an error for every poll before this was handled.
+  The `/ohlc` payload shape under `details` has not been seen yet; a dict holding a single list is accepted.
+- The live order book levels use `price` and `size`, `sequence` is an integer and `time` is in milliseconds,
+  as the doc describes.
 
 ## Consequences
 

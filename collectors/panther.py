@@ -321,7 +321,15 @@ class PantherCollector(BaseExchangeCollector):
         }
         async with self.session.get(f"{self.rest_url}{request_path}", headers=headers, timeout=5) as response:
             response.raise_for_status()
-            return await response.json(content_type=None)
+            body = await response.json(content_type=None)
+
+        # Live responses are wrapped: {"error_code": 0, "error_message": "", "details": <payload>}
+        # (the envelope is not in the API doc). A non-zero error_code is an API error.
+        if isinstance(body, dict) and "error_code" in body:
+            if body["error_code"] != 0:
+                raise ValueError(f"Panther API error {body['error_code']}: {body.get('error_message')} (GET {request_path})")
+            return body.get("details")
+        return body
 
     async def _fetch_and_write_rest(self, symbol: str):
         """Poll the REST order book every cycle and the closed 1m candles once per minute.
@@ -363,6 +371,10 @@ class PantherCollector(BaseExchangeCollector):
             f"/v1/products/{symbol}/ohlc",
             {"interval": PANTHER_KLINE_INTERVAL, "start_time": start_ms, "end_time": end_ms}
         )
+        if isinstance(raw_data, dict):
+            # The payload shape under `details` is undocumented; accept a dict holding a single list of candles
+            lists = [v for v in raw_data.values() if isinstance(v, list)]
+            raw_data = lists[0] if len(lists) == 1 else raw_data
         if not isinstance(raw_data, list):
             raise ValueError(f"Panther ohlc request for {symbol} failed: {raw_data}")
 
