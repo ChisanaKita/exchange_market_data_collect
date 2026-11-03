@@ -1,9 +1,13 @@
+import os
 import shutil
 import logging
 import asyncio
+import threading
+import zipfile
 from datetime import datetime, timezone
 from pathlib import Path
 import boto3
+from boto3.s3.transfer import TransferConfig
 from botocore.exceptions import NoCredentialsError, PartialCredentialsError
 
 from config import (
@@ -17,6 +21,43 @@ from config import (
 )
 
 logger = logging.getLogger("MarketDataUploader")
+
+# Multipart part size for the streamed upload (a stream has no known size, and S3 allows at most 10000 parts)
+UPLOAD_PART_SIZE = 64 * 1024 * 1024
+
+
+class _CountingWriter:
+    """Write-only (non-seekable) file object that counts the bytes written through it."""
+
+    def __init__(self, fileobj):
+        self._fileobj = fileobj
+        self.bytes_written = 0
+
+    def write(self, data):
+        self.bytes_written += len(data)
+        return self._fileobj.write(data)
+
+    def flush(self):
+        self._fileobj.flush()
+
+
+class _PipeReader:
+    """Read end of the zip pipe. If the zip producer failed, reaching EOF raises instead of looking like a clean
+    end of stream, so a truncated zip can never be uploaded as if it were complete."""
+
+    def __init__(self, fileobj, state: dict):
+        self._fileobj = fileobj
+        self._state = state
+
+    def read(self, size=-1):
+        data = self._fileobj.read(size)  # buffered: returns `size` bytes unless the stream has ended
+        if (size is None or size < 0 or len(data) < size) and self._state.get("error"):
+            raise RuntimeError(f"zip producer failed: {self._state['error']!r}")
+        return data
+
+    def close(self):
+        self._fileobj.close()
+
 
 class MarketDataUploader:
     def __init__(self, base_dir: str = LOCAL_DATA_DIR):
@@ -82,7 +123,9 @@ class MarketDataUploader:
         if not self.base_dir.exists():
             return
 
-        for path in self.base_dir.iterdir():
+        self._log_disk_status(today_str)
+
+        for path in sorted(self.base_dir.iterdir()):
             if not path.is_dir():
                 continue
 
@@ -105,55 +148,83 @@ class MarketDataUploader:
                     # Run CPU-bound zipping and S3 uploading in executors to prevent blocking event loop
                     await asyncio.to_thread(self._process_day_upload, path)
 
+    def _log_disk_status(self, today_str: str):
+        """Report free disk and any days still waiting to be uploaded, so a stuck uploader shows up in the logs."""
+        usage = shutil.disk_usage(self.base_dir)
+        pending = sorted(
+            p.name for p in self.base_dir.iterdir()
+            if p.is_dir() and len(p.name) == 8 and p.name.isdigit() and p.name < today_str
+        )
+        message = f"Disk: {usage.free / 1e9:.1f} GB free of {usage.total / 1e9:.1f} GB. Completed days waiting for upload: {pending or 'none'}"
+        if pending and usage.free / usage.total < 0.15:
+            logger.error(f"{message}. Disk is nearly full; uploads must succeed to free space.")
+        else:
+            logger.info(message)
+
+    def _stream_zip_to_s3(self, day_dir: Path, s3_key: str):
+        """Zip `day_dir` straight into an S3 multipart upload through a pipe, with no temporary zip on disk.
+
+        The previous implementation wrote the whole day's zip next to the data first, which needs free disk
+        space; on a full disk that failed forever and the cache could never be cleaned up.
+        """
+        read_fd, write_fd = os.pipe()
+        state = {"error": None, "bytes": 0}
+
+        def produce():
+            try:
+                with os.fdopen(write_fd, "wb") as write_end:
+                    counter = _CountingWriter(write_end)
+                    with zipfile.ZipFile(counter, "w", zipfile.ZIP_DEFLATED, allowZip64=True) as archive:
+                        for file_path in sorted(p for p in day_dir.rglob("*") if p.is_file()):
+                            # The day directory is the archive root (e.g. 20260616/hashkey/...)
+                            archive.write(file_path, arcname=file_path.relative_to(day_dir.parent).as_posix())
+                    state["bytes"] = counter.bytes_written
+            except BaseException as e:
+                state["error"] = e
+
+        producer = threading.Thread(target=produce, name=f"zip-{day_dir.name}", daemon=True)
+        producer.start()
+        reader = _PipeReader(os.fdopen(read_fd, "rb"), state)
+        try:
+            self.s3_client.upload_fileobj(
+                reader,
+                Bucket=S3_BUCKET_NAME,
+                Key=s3_key,
+                Config=TransferConfig(multipart_chunksize=UPLOAD_PART_SIZE)
+            )
+        finally:
+            reader.close()  # unblocks the producer (broken pipe) if the upload stopped early
+            producer.join()
+
+        if state["error"]:
+            raise state["error"]
+
+        # Never delete local data unless S3 holds exactly the bytes we produced
+        remote_size = self.s3_client.head_object(Bucket=S3_BUCKET_NAME, Key=s3_key)["ContentLength"]
+        if remote_size != state["bytes"]:
+            raise RuntimeError(f"S3 object size {remote_size} != zip size {state['bytes']} for {s3_key}")
+        return state["bytes"]
+
     def _process_day_upload(self, day_dir: Path):
-        """Synchronous CPU/Network-bound routine to zip and upload a completed day."""
+        """Zip and upload a completed day, then delete it locally only after the upload is verified."""
         day_str = day_dir.name
         year = day_str[0:4]
         month = day_str[4:6]
         day = day_str[6:8]
 
-        zip_file_path = self.base_dir / f"{day_str}.zip"
-        
-        try:
-            logger.info(f"Compressing {day_dir} into {zip_file_path}...")
-            # Create a zip archive containing the day directory as the root (e.g. 20260616/binance/...)
-            archive_base = self.base_dir / day_str
-            shutil.make_archive(
-                str(archive_base),
-                "zip",
-                root_dir=str(day_dir.parent),
-                base_dir=day_str
-            )
-            
-            if not zip_file_path.exists():
-                raise FileNotFoundError(f"Failed to create zip file: {zip_file_path}")
+        # Calculate S3 target key: e.g. crypto-market-data/2026/06/16/20260616.zip
+        s3_key = f"{S3_PREFIX}{year}/{month}/{day}/{day_str}.zip"
 
-            # Calculate S3 target key: e.g. crypto-market-data/2026/06/16/20260616.zip
-            s3_key = f"{S3_PREFIX}{year}/{month}/{day}/{day_str}.zip"
-            
-            logger.info(f"Uploading {zip_file_path} to s3://{S3_BUCKET_NAME}/{s3_key}...")
-            
-            # Perform S3 upload
-            self.s3_client.upload_file(
-                Filename=str(zip_file_path),
-                Bucket=S3_BUCKET_NAME,
-                Key=s3_key
-            )
-            
-            logger.info(f"S3 upload successful for {day_str}!")
-            
-            # On success, clean up local folders to save space
-            logger.info(f"Cleaning up local directories and temp files for {day_str}...")
+        try:
+            logger.info(f"Zipping {day_dir} and streaming it to s3://{S3_BUCKET_NAME}/{s3_key}...")
+            size = self._stream_zip_to_s3(day_dir, s3_key)
+            logger.info(f"S3 upload successful for {day_str} ({size / 1e6:.1f} MB zipped).")
+
+            # On success, clean up the local day directory to save space
             shutil.rmtree(day_dir)
-            zip_file_path.unlink()
             logger.info(f"Cleanup finished. Day {day_str} successfully archived to S3.")
 
         except (NoCredentialsError, PartialCredentialsError) as cred_err:
             logger.error(f"S3 Upload failed due to credentials error: {cred_err}. Leaving files local.")
-            # Delete the temp zip file so we don't waste disk space, but leave the directory to try again
-            if zip_file_path.exists():
-                zip_file_path.unlink()
         except Exception as e:
-            logger.error(f"Failed to process and upload {day_str}: {e}. Leaving files local.")
-            if zip_file_path.exists():
-                zip_file_path.unlink()
+            logger.error(f"Failed to process and upload {day_str}: {e!r}. Leaving files local.", exc_info=True)
