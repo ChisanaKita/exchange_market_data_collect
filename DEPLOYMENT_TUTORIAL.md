@@ -20,20 +20,79 @@ Instead of putting AWS root or secret keys in `.env` files, attach an IAM Role t
     "Version": "2012-10-17",
     "Statement": [
         {
-            "Sid": "AllowCollectorS3Operations",
+            "Sid": "AllowCollectorObjectOperations",
             "Effect": "Allow",
             "Action": [
                 "s3:PutObject",
                 "s3:PutObjectAcl",
-                "s3:GetObject"
+                "s3:GetObject",
+                "s3:AbortMultipartUpload",
+                "s3:ListMultipartUploadParts"
             ],
-            "Resource": [
-                "arn:aws:s3:::your-market-data-bucket",
-                "arn:aws:s3:::your-market-data-bucket/crypto-market-data/*"
-            ]
+            "Resource": "arn:aws:s3:::your-market-data-bucket/crypto-market-data/*"
+        },
+        {
+            "Sid": "AllowBucketLevelChecks",
+            "Effect": "Allow",
+            "Action": [
+                "s3:ListBucket",
+                "s3:ListBucketMultipartUploads"
+            ],
+            "Resource": "arn:aws:s3:::your-market-data-bucket"
         }
     ]
 }
+```
+
+Why these actions:
+* The uploader streams each day's zip to S3 as a **multipart upload** (see `docs/adr/0005-stream-day-archive-to-s3.md`). When an upload fails, the AWS SDK calls `AbortMultipartUpload` to discard the uploaded parts; without this permission the abort is refused and the orphaned parts stay in the bucket and keep being billed.
+* `s3:GetObject` lets the uploader read the object size back (`HEAD`) before it deletes the local day.
+* `s3:ListBucket` and `s3:ListBucketMultipartUploads` are bucket-level actions (the bucket ARN without `/*`). The app does not need them; they let you run `aws s3 ls` and `aws s3api list-multipart-uploads` from the instance.
+
+### 3. Bucket Lifecycle Rule for Incomplete Uploads (one-time setup)
+If the collector is killed in the middle of an upload (instance stopped, out-of-memory kill, network down), the abort call never runs and the uploaded parts remain. A lifecycle rule makes S3 delete them automatically after one day.
+
+The person who applies the rule needs these two permissions. They are **not** needed by the instance role, so keep them on your admin user or role:
+
+```json
+{
+    "Version": "2012-10-17",
+    "Statement": [
+        {
+            "Sid": "ManageBucketLifecycle",
+            "Effect": "Allow",
+            "Action": [
+                "s3:GetLifecycleConfiguration",
+                "s3:PutLifecycleConfiguration"
+            ],
+            "Resource": "arn:aws:s3:::your-market-data-bucket"
+        }
+    ]
+}
+```
+
+`put-bucket-lifecycle-configuration` **replaces the whole lifecycle configuration**, so read the current one first and merge into it if it already has rules:
+
+```bash
+aws s3api get-bucket-lifecycle-configuration --bucket your-market-data-bucket --region your-region
+```
+
+Save the rule as `rule.json` (`file://rule.json` is relative to the folder you run the command from; use `file:///home/ubuntu/rule.json` for an absolute path):
+
+```json
+{"Rules":[{"ID":"abort-incomplete-multipart","Status":"Enabled","Filter":{"Prefix":""},"AbortIncompleteMultipartUpload":{"DaysAfterInitiation":1}}]}
+```
+
+```bash
+aws s3api put-bucket-lifecycle-configuration \
+  --bucket your-market-data-bucket --region your-region \
+  --lifecycle-configuration file://rule.json
+```
+
+Check for orphaned parts that already exist (an empty result with no `Uploads` list means none):
+
+```bash
+aws s3api list-multipart-uploads --bucket your-market-data-bucket --region your-region
 ```
 
 ---
@@ -167,3 +226,12 @@ tail -f local_cache/$(date -u +%Y%m%d)/binance/BTCUSDT/spot/trades.jsonl
   sudo curl -SL "https://github.com/docker/compose/releases/latest/download/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/lib/docker/cli-plugins/docker-compose
   sudo chmod +x /usr/local/lib/docker/cli-plugins/docker-compose
   ```
+
+### Issue 3: Local disk keeps filling up (completed days are not uploaded)
+* **Symptoms**: `local_cache` holds old `YYYYMMDD` folders and `df -h /` shows the disk almost full.
+* **Check**: the uploader logs `Disk: ... GB free ... Completed days waiting for upload: [...]` every hour, and `Failed to process and upload <day>` with a full traceback when a day fails. Search the log for them:
+  ```bash
+  docker logs crypto-market-data-collector 2>&1 | grep -E "Failed to process|Disk:|credentials"
+  ```
+* **Common causes**: S3 permissions or credentials (Issue 1), or files in `local_cache` owned by a different user than the one running the collector (for example root from a Docker run, then `ubuntu` from a manual run; fix with `sudo chown -R ubuntu:ubuntu local_cache`). Always run the collector as one user.
+* **Recovery**: fix the cause and restart the app; completed days are uploaded oldest first and removed after S3 confirms the size. The upload needs no free disk space, so a full disk does not block it. To see what is using space: `du -sh local_cache/*`.
