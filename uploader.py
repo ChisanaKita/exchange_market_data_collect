@@ -123,6 +123,7 @@ class MarketDataUploader:
         if not self.base_dir.exists():
             return
 
+        self._remove_stale_zips()
         self._log_disk_status(today_str)
 
         for path in sorted(self.base_dir.iterdir()):
@@ -147,6 +148,23 @@ class MarketDataUploader:
                     logger.info(f"Found completed day directory ready for S3 upload: {dir_name}")
                     # Run CPU-bound zipping and S3 uploading in executors to prevent blocking event loop
                     await asyncio.to_thread(self._process_day_upload, path)
+
+    def _remove_stale_zips(self):
+        """Delete YYYYMMDD.zip files that earlier versions staged in the cache and left behind.
+
+        Only zips whose day directory still exists are removed: the directory is deleted after a verified upload,
+        so while it exists the zip is an unfinished temporary copy. Removal is best effort (a zip owned by
+        another user, e.g. root from a Docker run, cannot be deleted and is only reported).
+        """
+        for zip_path in sorted(self.base_dir.glob("????????.zip")):
+            if not (zip_path.stem.isdigit() and (self.base_dir / zip_path.stem).is_dir()):
+                continue
+            try:
+                size = zip_path.stat().st_size
+                zip_path.unlink()
+                logger.warning(f"Removed stale temporary archive {zip_path} ({size / 1e9:.2f} GB) left by an earlier run.")
+            except OSError as e:
+                logger.error(f"Cannot remove stale archive {zip_path}: {e}. Fix with: sudo rm {zip_path}")
 
     def _log_disk_status(self, today_str: str):
         """Report free disk and any days still waiting to be uploaded, so a stuck uploader shows up in the logs."""

@@ -23,6 +23,11 @@ written, so the upload failed on every hourly retry and the data that needed fre
   and every hourly pass logs free disk and the completed days still waiting to be uploaded (ERROR when
   free space is under 15% with a backlog).
 
+- Zips that earlier versions left in the cache (`YYYYMMDD.zip` whose day directory still exists) are
+  deleted best effort at the start of each pass. A relaunch log on 2026-11-03 showed the old code failing
+  on `Permission denied: 'local_cache/20261029.zip'`, a stale zip it could not overwrite, which left that
+  day (and its disk space) stuck. If another user owns the zip it is reported with the `sudo rm` to run.
+
 ## Consequences
 
 - A full disk no longer blocks cleanup; the first failing step is visible in the log.
