@@ -19,6 +19,7 @@ from config import (
     S3_PREFIX,
     UPLOAD_DELAY_MINUTES
 )
+from app_logging import ALERT
 
 logger = logging.getLogger("MarketDataUploader")
 
@@ -176,8 +177,11 @@ class MarketDataUploader:
             if p.is_dir() and len(p.name) == 8 and p.name.isdigit() and p.name < today_str
         )
         message = f"Disk: {usage.free / 1e9:.1f} GB free of {usage.total / 1e9:.1f} GB. Completed days waiting for upload: {pending or 'none'}"
-        if pending and usage.free / usage.total < 0.15:
+        free_ratio = usage.free / usage.total
+        if pending and free_ratio < 0.15:
             logger.error(f"{message}. Disk is nearly full; uploads must succeed to free space.")
+        elif free_ratio < 0.10:
+            logger.error(f"{message}. Disk is nearly full.")
         else:
             logger.info(message)
 
@@ -247,7 +251,11 @@ class MarketDataUploader:
 
             # On success, clean up the local day directory to save space
             shutil.rmtree(day_dir)
-            logger.info(f"Cleanup finished. Day {day_str} successfully archived to S3.")
+            free_gb = shutil.disk_usage(self.base_dir).free / 1e9
+            logger.info(
+                f"Day {day_str} archived to S3 ({size / 1e6:.1f} MB) and removed locally. {free_gb:.1f} GB disk free.",
+                extra=ALERT
+            )
 
         except (NoCredentialsError, PartialCredentialsError) as cred_err:
             logger.error(f"S3 Upload failed due to credentials error: {cred_err}. Leaving files local.")

@@ -189,7 +189,22 @@ docker compose logs -f --tail 100
 tail -f logs/app_$(date -u +%F).log
 ```
 
-### 2. Verify Folder Structures
+### 2. Telegram Alerts
+Set `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID` and `ALERT_INSTANCE_NAME` in `.env`, then `docker compose up -d`. A bot can only message people who have sent it `/start`; the chat id comes from `https://api.telegram.org/bot<token>/getUpdates`. You are alerted when:
+
+| Alert | When |
+| :--- | :--- |
+| Collector started / shutting down | Every start, and on `SIGTERM` (`docker compose down`, instance stop) |
+| No market data for 5+ min | A configured symbol has written nothing for `STALE_DATA_ALERT_MINUTES`; one more message when it resumes. A full disk shows up here too |
+| Day archived to S3 | Each completed day after the upload is verified and the local copy deleted, with free disk space |
+| Upload failed, disk nearly full, uploader errors | Any ERROR outside the exchange collectors, repeated at most once an hour while it persists |
+| Crash | Any CRITICAL or uncaught exception |
+
+WebSocket reconnects and REST errors inside the collectors are not sent (they recover on their own); the no-data alert reports them if they last. At most 30 alerts are sent per hour; everything is still in `logs/`.
+
+If you get no "Day archived" message within an hour after UTC midnight, the upload did not succeed.
+
+### 3. Verify Folder Structures
 Confirm that our `MarketDataWriter` is dynamically creating the daily storage hierarchies:
 ```bash
 find local_cache/
@@ -197,7 +212,7 @@ find local_cache/
 You should see paths structured as:
 `local_cache/{YYYYMMDD}/{exchange}/{symbol}/{market_type}/{category}.jsonl`
 
-### 3. Tail Real-Time Trade Streams
+### 4. Tail Real-Time Trade Streams
 Ensure trades are being buffered to disk successfully:
 ```bash
 tail -f local_cache/$(date -u +%Y%m%d)/binance/BTCUSDT/spot/trades.jsonl

@@ -14,6 +14,9 @@ from pathlib import Path
 
 from loguru import logger
 
+# Pass as `extra=ALERT` on a stdlib logging call to also send that record to Telegram (see alerts.py)
+ALERT = {"alert": True}
+
 LOG_FORMAT = "{time:YYYY-MM-DD HH:mm:ss.SSS!UTC} [{level}] {extra[logger_name]}: {message}"
 
 # Chatty third-party libraries are capped at WARNING
@@ -35,7 +38,7 @@ class _InterceptHandler(logging.Handler):
             frame = frame.f_back
             depth += 1
 
-        logger.bind(logger_name=record.name).opt(depth=depth, exception=record.exc_info).log(
+        logger.bind(logger_name=record.name, alert=getattr(record, "alert", False)).opt(depth=depth, exception=record.exc_info).log(
             level, record.getMessage()
         )
 
@@ -101,7 +104,7 @@ def setup_logging(
     log_path.mkdir(parents=True, exist_ok=True)
 
     logger.remove()
-    logger.configure(extra={"logger_name": "app"})
+    logger.configure(extra={"logger_name": "app", "alert": False})
 
     # diagnose=False: loguru's variable dump in tracebacks could write API secrets into the log
     logger.add(sys.stdout, level=level, format=LOG_FORMAT, backtrace=False, diagnose=False)

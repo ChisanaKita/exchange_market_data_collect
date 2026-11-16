@@ -1,9 +1,10 @@
 import json
 import logging
 import asyncio
+import time
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Dict, Any
+from typing import Dict, Any, Tuple
 from collections import OrderedDict
 
 from config import LOCAL_DATA_DIR
@@ -18,6 +19,8 @@ class MarketDataWriter:
         self.max_handles = 800  # Safe limit under standard 1024 OS descriptor limit
         self.lock = asyncio.Lock()
         self.current_day_utc = self._get_current_day_utc()
+        # Monotonic time of the last successful write per (exchange, symbol), read by DataFreshnessMonitor
+        self.last_write: Dict[Tuple[str, str], float] = {}
 
     def _get_current_day_utc(self) -> str:
         """Get current day formatted as YYYYMMDD in UTC."""
@@ -78,6 +81,7 @@ class MarketDataWriter:
             try:
                 line = json.dumps(payload, separators=(',', ':')) + "\n"
                 self.file_handles[handle_key].write(line)
+                self.last_write[(exchange, symbol)] = time.monotonic()
             except Exception as e:
                 logger.error(f"Failed to write record to {handle_key}: {e}")
 

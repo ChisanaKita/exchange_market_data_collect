@@ -59,9 +59,16 @@ from config import (
     LOG_LEVEL,
     LOG_RETENTION_DAYS,
     LOG_MAX_FILE_MB,
-    LOG_MAX_TOTAL_MB
+    LOG_MAX_TOTAL_MB,
+    TELEGRAM_BOT_TOKEN,
+    TELEGRAM_CHAT_ID,
+    ALERT_INSTANCE_NAME,
+    TELEGRAM_ALERT_COOLDOWN_MINUTES,
+    STALE_DATA_ALERT_MINUTES
 )
-from app_logging import setup_logging
+from app_logging import setup_logging, ALERT
+from alerts import add_telegram_sink
+from monitor import DataFreshnessMonitor
 
 
 # stdout plus daily log files kept for LOG_RETENTION_DAYS (docker logs alone are capped and lost on recreate)
@@ -69,6 +76,7 @@ log_path = setup_logging(LOG_DIR, LOG_LEVEL, LOG_RETENTION_DAYS, LOG_MAX_FILE_MB
 
 logger = logging.getLogger("Main")
 logger.info(f"Writing application logs to {log_path.resolve()} (kept {LOG_RETENTION_DAYS} days).")
+add_telegram_sink(TELEGRAM_BOT_TOKEN, TELEGRAM_CHAT_ID, ALERT_INSTANCE_NAME, TELEGRAM_ALERT_COOLDOWN_MINUTES)
 
 
 class Application:
@@ -76,6 +84,7 @@ class Application:
         self.writer = None
         self.collectors = []
         self.uploader = None
+        self.monitor = None
         self.shutdown_event = asyncio.Event()
 
     async def run(self):
@@ -170,7 +179,19 @@ class Application:
         for collector in self.collectors:
             await collector.start()
 
-        logger.info(f"All {len(self.collectors)} exchange collectors are active. Collection running. Press Ctrl+C to stop.")
+        # 6. Alert when any configured symbol stops producing data
+        self.monitor = DataFreshnessMonitor(
+            self.writer,
+            {collector.exchange_name: collector.target_symbols for collector in self.collectors},
+            stale_after=STALE_DATA_ALERT_MINUTES * 60
+        )
+        await self.monitor.start()
+
+        exchanges = ", ".join(collector.exchange_name for collector in self.collectors)
+        logger.info(
+            f"Collector started: {len(self.collectors)} exchanges active ({exchanges}).",
+            extra=ALERT
+        )
         
         # Keep running until shutdown signal is received
         await self.shutdown_event.wait()
@@ -189,13 +210,16 @@ class Application:
                 pass
 
     def _handle_shutdown_signal(self, sig):
-        logger.info(f"Received termination signal {sig.name}. Initiating graceful shutdown...")
+        logger.warning(f"Received termination signal {sig.name}. Shutting down; market data collection stops.", extra=ALERT)
         self.shutdown_event.set()
 
     async def _shutdown(self):
         """Orchestrate multi-step shutdown of all services."""
         logger.info("Stopping collectors and flushing files...")
         
+        if self.monitor:
+            await self.monitor.stop()
+
         # Stop all collectors concurrently
         if self.collectors:
             logger.info("Stopping exchange collectors...")

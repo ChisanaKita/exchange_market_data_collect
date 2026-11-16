@@ -304,6 +304,8 @@ docker-compose logs -f
 
 Application logs are also written to `./logs/app_YYYY-MM-DD.log` (one file per UTC day) and kept for 30 days (`LOG_RETENTION_DAYS`).
 
+Set `TELEGRAM_BOT_TOKEN` and `TELEGRAM_CHAT_ID` in `.env` to get Telegram alerts for startup and shutdown, symbols that stop producing data, daily S3 archives, and upload or disk errors (see `DEPLOYMENT_TUTORIAL.md`).
+
 Stop the container safely (flushes active file buffers):
 ```bash
 docker-compose down

@@ -26,6 +26,18 @@ LOG_MAX_FILE_MB = int(os.getenv("LOG_MAX_FILE_MB", "100"))
 # Upper bound for all log files together, so a log flood cannot fill the disk that holds the market data
 LOG_MAX_TOTAL_MB = int(os.getenv("LOG_MAX_TOTAL_MB", "2000"))
 
+# --- Telegram Alerts ---
+# Alerts are off unless both are set. The chat id is numeric; get it by sending /start to the bot, then reading
+# https://api.telegram.org/bot<token>/getUpdates (message.chat.id). A bot cannot message a @username directly.
+TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN", "")
+TELEGRAM_CHAT_ID = os.getenv("TELEGRAM_CHAT_ID", "")
+# Shown at the start of every alert; defaults to the host name (the container id under Docker)
+ALERT_INSTANCE_NAME = os.getenv("ALERT_INSTANCE_NAME", "")
+# The same alert (ignoring numbers) is sent at most once per this many minutes
+TELEGRAM_ALERT_COOLDOWN_MINUTES = float(os.getenv("TELEGRAM_ALERT_COOLDOWN_MINUTES", "60"))
+# Alert when a configured symbol has written no data for this many minutes
+STALE_DATA_ALERT_MINUTES = float(os.getenv("STALE_DATA_ALERT_MINUTES", "5"))
+
 # Time (in minutes) to wait after midnight UTC before zipping and uploading the previous day's data
 UPLOAD_DELAY_MINUTES = int(os.getenv("UPLOAD_DELAY_MINUTES", "5"))
 
