@@ -19,7 +19,7 @@ COPY . .
 
 # Declare a volume for persistent storage of local cache JSONL files
 # This prevents data loss if the container is recreated mid-day
-VOLUME ["/app/local_cache"]
+VOLUME ["/app/local_cache", "/app/logs"]
 
 # Execute the application orchestrator
 CMD ["python", "main.py"]

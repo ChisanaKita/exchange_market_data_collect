@@ -16,6 +16,16 @@ S3_PREFIX = os.getenv("S3_PREFIX", "crypto-market-data/")
 # --- Storage Settings ---
 LOCAL_DATA_DIR = os.getenv("LOCAL_DATA_DIR", "./local_cache")
 
+# --- Logging Settings ---
+# Application log files (one per UTC day, split early at LOG_MAX_FILE_MB), deleted after LOG_RETENTION_DAYS.
+# Keep outside LOCAL_DATA_DIR.
+LOG_DIR = os.getenv("LOG_DIR", "./logs")
+LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO").upper()
+LOG_RETENTION_DAYS = int(os.getenv("LOG_RETENTION_DAYS", "30"))
+LOG_MAX_FILE_MB = int(os.getenv("LOG_MAX_FILE_MB", "100"))
+# Upper bound for all log files together, so a log flood cannot fill the disk that holds the market data
+LOG_MAX_TOTAL_MB = int(os.getenv("LOG_MAX_TOTAL_MB", "2000"))
+
 # Time (in minutes) to wait after midnight UTC before zipping and uploading the previous day's data
 UPLOAD_DELAY_MINUTES = int(os.getenv("UPLOAD_DELAY_MINUTES", "5"))
 

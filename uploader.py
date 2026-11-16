@@ -110,9 +110,10 @@ class MarketDataUploader:
                 # Run the upload check on startup and then every hour
                 await self.check_and_upload_completed_days()
             except Exception as e:
-                logger.error(f"Error in uploader loop iteration: {e}")
-            
+                logger.error(f"Error in uploader loop iteration: {e!r}", exc_info=True)
+
             # Sleep for 1 hour before checking again
+            logger.info("Next upload check in 60 minutes.")
             await asyncio.sleep(3600)
 
     async def check_and_upload_completed_days(self):

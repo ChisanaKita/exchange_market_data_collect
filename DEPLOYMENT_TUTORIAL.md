@@ -184,6 +184,11 @@ docker compose logs -f --tail 100
 ```
 *(Press `Ctrl+C` to close the log stream; the container continues running in the background).*
 
+`docker compose logs` keeps only the last 50 MB and is lost when the container is recreated (`up --build`, `down`). The full application log is also written to `./logs` on the host, one file per UTC day (`app_YYYY-MM-DD.log`, split into extra files past 100 MB), and files older than 30 days are deleted at the next UTC midnight. The oldest files are also deleted if all logs together exceed 2 GB. Change this with `LOG_RETENTION_DAYS`, `LOG_MAX_FILE_MB`, `LOG_MAX_TOTAL_MB` and `LOG_LEVEL` in `.env`.
+```bash
+tail -f logs/app_$(date -u +%F).log
+```
+
 ### 2. Verify Folder Structures
 Confirm that our `MarketDataWriter` is dynamically creating the daily storage hierarchies:
 ```bash
@@ -231,7 +236,7 @@ tail -f local_cache/$(date -u +%Y%m%d)/binance/BTCUSDT/spot/trades.jsonl
 * **Symptoms**: `local_cache` holds old `YYYYMMDD` folders and `df -h /` shows the disk almost full.
 * **Check**: the uploader logs `Disk: ... GB free ... Completed days waiting for upload: [...]` every hour, and `Failed to process and upload <day>` with a full traceback when a day fails. Search the log for them:
   ```bash
-  docker logs crypto-market-data-collector 2>&1 | grep -E "Failed to process|Disk:|credentials"
+  grep -hE "Failed to process|Disk:|credentials|S3 upload|uploader loop" logs/app_*.log
   ```
 * **Common causes**: S3 permissions or credentials (Issue 1), or files in `local_cache` owned by a different user than the one running the collector (for example root from a Docker run, then `ubuntu` from a manual run; fix with `sudo chown -R ubuntu:ubuntu local_cache`). Always run the collector as one user.
 * **Recovery**: fix the cause and restart the app; completed days are uploaded oldest first and removed after S3 confirms the size. The upload needs no free disk space, so a full disk does not block it. To see what is using space: `du -sh local_cache/*`.

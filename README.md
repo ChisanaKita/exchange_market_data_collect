@@ -302,6 +302,8 @@ View real-time logs:
 docker-compose logs -f
 ```
 
+Application logs are also written to `./logs/app_YYYY-MM-DD.log` (one file per UTC day) and kept for 30 days (`LOG_RETENTION_DAYS`).
+
 Stop the container safely (flushes active file buffers):
 ```bash
 docker-compose down

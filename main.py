@@ -54,25 +54,21 @@ from config import (
     PANTHER_API_SECRET,
     PANTHER_PASSPHRASE,
     PANTHER_REST_POLL_INTERVAL_MS,
-    PANTHER_REST_RATE_LIMIT_RPS
+    PANTHER_REST_RATE_LIMIT_RPS,
+    LOG_DIR,
+    LOG_LEVEL,
+    LOG_RETENTION_DAYS,
+    LOG_MAX_FILE_MB,
+    LOG_MAX_TOTAL_MB
 )
+from app_logging import setup_logging
 
 
-# Configure logging with a clean, detailed, and human-readable format
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
-    handlers=[
-        logging.StreamHandler(sys.stdout)
-    ]
-)
-# Reduce verbose logging from third party libraries
-logging.getLogger("websockets").setLevel(logging.WARNING)
-logging.getLogger("urllib3").setLevel(logging.WARNING)
-logging.getLogger("botocore").setLevel(logging.WARNING)
-logging.getLogger("boto3").setLevel(logging.WARNING)
+# stdout plus daily log files kept for LOG_RETENTION_DAYS (docker logs alone are capped and lost on recreate)
+log_path = setup_logging(LOG_DIR, LOG_LEVEL, LOG_RETENTION_DAYS, LOG_MAX_FILE_MB, LOG_MAX_TOTAL_MB)
 
 logger = logging.getLogger("Main")
+logger.info(f"Writing application logs to {log_path.resolve()} (kept {LOG_RETENTION_DAYS} days).")
 
 
 class Application:

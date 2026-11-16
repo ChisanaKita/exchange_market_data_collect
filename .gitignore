@@ -220,3 +220,6 @@ __marimo__/
 # Collected market data and archives must never be committed
 *.jsonl
 *.zip
+
+# Application log files written by app_logging.py
+logs/
