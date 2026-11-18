@@ -346,7 +346,8 @@ class PantherCollector(BaseExchangeCollector):
 
     async def _fetch_orderbook(self, symbol: str):
         raw_data = await self._get_json(f"/v1/products/{symbol}/orderbook", {"depth": PANTHER_BOOK_DEPTH})
-        if not isinstance(raw_data, dict) or "bids" not in raw_data or "asks" not in raw_data:
+        # A side with no orders is omitted from the reply (a thin book may have asks only), so one side is enough
+        if not isinstance(raw_data, dict) or ("bids" not in raw_data and "asks" not in raw_data):
             raise ValueError(f"Panther orderbook request for {symbol} failed: {raw_data}")
 
         await self.writer.write(
