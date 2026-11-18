@@ -159,7 +159,8 @@ class BaseExchangeCollector:
                 else:
                     self.logger.error(f"HTTP error fetching REST data for {symbol}: status={cre.status}, msg={cre.message}")
             except Exception as e:
-                self.logger.error(f"Error polling REST data for {symbol}: {e}")
+                # repr, not str: a timeout's str() is empty
+                self.logger.error(f"Error polling REST data for {symbol}: {e!r}")
 
             # Space out consecutive requests of the same poller task
             elapsed = asyncio.get_event_loop().time() - start_time
