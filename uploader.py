@@ -8,7 +8,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 import boto3
 from boto3.s3.transfer import TransferConfig
-from botocore.exceptions import NoCredentialsError, PartialCredentialsError
+from botocore.exceptions import ClientError, NoCredentialsError, PartialCredentialsError
 
 from config import (
     LOCAL_DATA_DIR,
@@ -26,6 +26,10 @@ logger = logging.getLogger("MarketDataUploader")
 # Multipart part size for the streamed upload. A stream has no known size and S3 allows at most 10000 parts
 # (16 MB parts -> up to 160 GB per day). boto3 buffers up to 10 parts in memory, so this also bounds RAM to ~160 MB.
 UPLOAD_PART_SIZE = 16 * 1024 * 1024
+
+# A day folder is renamed to this prefix + YYYYMMDD once its archive is verified in S3, then deleted. The scan for
+# pending days only matches 8-digit names, so leftovers of a failed delete are never uploaded again.
+UPLOADED_DIR_PREFIX = ".uploaded-"
 
 
 class _CountingWriter:
@@ -127,6 +131,7 @@ class MarketDataUploader:
             return
 
         self._remove_stale_zips()
+        self._remove_uploaded_leftovers()
         self._log_disk_status(today_str)
 
         for path in sorted(self.base_dir.iterdir()):
@@ -168,6 +173,38 @@ class MarketDataUploader:
                 logger.warning(f"Removed stale temporary archive {zip_path} ({size / 1e9:.2f} GB) left by an earlier run.")
             except OSError as e:
                 logger.error(f"Cannot remove stale archive {zip_path}: {e}. Fix with: sudo rm {zip_path}")
+
+    def _remove_uploaded_leftovers(self):
+        """Retry deleting day folders whose archive is already in S3 but whose local delete failed earlier."""
+        for path in sorted(self.base_dir.glob(UPLOADED_DIR_PREFIX + "*")):
+            if path.is_dir() and self._remove_uploaded_dir(path):
+                logger.info(f"Removed leftover {path}; its archive was uploaded earlier.")
+
+    def _remove_uploaded_dir(self, path: Path) -> bool:
+        """Delete a folder whose archive is verified in S3. Returns False (and logs why) if it could not be deleted."""
+        try:
+            shutil.rmtree(path)
+            return True
+        except OSError as e:
+            logger.error(
+                f"Archive of {path.name} is in S3, but {path} could not be fully deleted: {e!r}. "
+                f"Retrying every pass; if another user owns the files, fix with: sudo chown -R $(id -un) {path}"
+            )
+            return False
+
+    def _archive_exists(self, s3_key: str) -> bool:
+        """True if the S3 key exists. Raises if S3 cannot tell (e.g. 403 without s3:ListBucket), so nothing is
+        uploaded over an archive we could not rule out."""
+        try:
+            self.s3_client.head_object(Bucket=S3_BUCKET_NAME, Key=s3_key)
+            return True
+        except ClientError as e:
+            if e.response.get("Error", {}).get("Code") in ("404", "NoSuchKey", "NotFound"):
+                return False
+            raise RuntimeError(
+                f"Cannot check whether s3://{S3_BUCKET_NAME}/{s3_key} exists ({e}). "
+                f"The instance role needs s3:ListBucket on the bucket for HEAD to report missing keys as 404."
+            ) from e
 
     def _log_disk_status(self, today_str: str):
         """Report free disk and any days still waiting to be uploaded, so a stuck uploader shows up in the logs."""
@@ -245,12 +282,23 @@ class MarketDataUploader:
         s3_key = f"{S3_PREFIX}{year}/{month}/{day}/{day_str}.zip"
 
         try:
+            if self._archive_exists(s3_key):
+                logger.error(
+                    f"s3://{S3_BUCKET_NAME}/{s3_key} already exists; refusing to overwrite it with {day_dir}. "
+                    f"Compare the two, then delete or move one of them. Leaving files local."
+                )
+                return
+
             logger.info(f"Zipping {day_dir} and streaming it to s3://{S3_BUCKET_NAME}/{s3_key}...")
             size = self._stream_zip_to_s3(day_dir, s3_key)
             logger.info(f"S3 upload successful for {day_str} ({size / 1e6:.1f} MB zipped).")
 
-            # On success, clean up the local day directory to save space
-            shutil.rmtree(day_dir)
+            # Rename before deleting: if the delete fails partway, the leftovers no longer look like a pending day,
+            # so they are never zipped again over the complete archive
+            uploaded_dir = day_dir.with_name(UPLOADED_DIR_PREFIX + day_str)
+            day_dir.rename(uploaded_dir)
+            if not self._remove_uploaded_dir(uploaded_dir):
+                return
             free_gb = shutil.disk_usage(self.base_dir).free / 1e9
             logger.info(
                 f"Day {day_str} archived to S3 ({size / 1e6:.1f} MB) and removed locally. {free_gb:.1f} GB disk free.",

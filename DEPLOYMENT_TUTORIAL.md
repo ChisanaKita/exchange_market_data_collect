@@ -47,7 +47,9 @@ Instead of putting AWS root or secret keys in `.env` files, attach an IAM Role t
 Why these actions:
 * The uploader streams each day's zip to S3 as a **multipart upload** (see `docs/adr/0005-stream-day-archive-to-s3.md`). When an upload fails, the AWS SDK calls `AbortMultipartUpload` to discard the uploaded parts; without this permission the abort is refused and the orphaned parts stay in the bucket and keep being billed.
 * `s3:GetObject` lets the uploader read the object size back (`HEAD`) before it deletes the local day.
-* `s3:ListBucket` and `s3:ListBucketMultipartUploads` are bucket-level actions (the bucket ARN without `/*`). The app does not need them; they let you run `aws s3 ls` and `aws s3api list-multipart-uploads` from the instance.
+* `s3:ListBucket` is **required**. Before each upload the app checks that the day's archive is not already in S3, so it never overwrites one (see `docs/adr/0008-never-overwrite-an-uploaded-archive.md`). Without `s3:ListBucket`, S3 answers that check with 403 instead of 404 for a missing key, and the app refuses to upload.
+* `s3:ListBucketMultipartUploads` is not needed by the app; it lets you run `aws s3api list-multipart-uploads` from the instance. Both are bucket-level actions (the bucket ARN without `/*`).
+* Turn on **bucket versioning** (`aws s3api put-bucket-versioning --bucket your-market-data-bucket --versioning-configuration Status=Enabled`), so an overwritten or deleted archive can still be restored.
 
 ### 3. Bucket Lifecycle Rule for Incomplete Uploads (one-time setup)
 If the collector is killed in the middle of an upload (instance stopped, out-of-memory kill, network down), the abort call never runs and the uploaded parts remain. A lifecycle rule makes S3 delete them automatically after one day.
