@@ -75,6 +75,8 @@ The zipped file uploaded to S3 contains the following program-friendly nested hi
     │   └── ...
     ├── bitget/
     │   ├── BTCUSDT/
+    │   │   ├── spot/       # same symbol can be in both markets
+    │   │   │   └── ...
     │   │   └── futures/
     │   │       └── ...
     │   └── ...
@@ -243,7 +245,8 @@ Symbols are exchange-native and used verbatim ([ADR 0002](docs/adr/0002-config-i
 | `HASHKEY_GLOBAL_TARGET_SYMBOLS` | Comma-separated target symbols for Hashkey Global (`hashkey_global`). | `BTCUSDT-PERPETUAL,ETHUSDT-PERPETUAL` |
 | `HASHKEY_HK_TARGET_SYMBOLS` | Comma-separated HashKey-native target symbols for Hashkey HK (`hashkey`) | `BTCUSD,BTCUSDT,ETHUSD,ETHUSDT,SOLUSD,AVAXUSD,XRPUSD,LINKUSD,ARBUSD,USDTUSD,USDTHKD` |
 | `HASHKEY_MENA_TARGET_SYMBOLS` | Comma-separated HashKey-native target symbols for Hashkey MENA (`hashkey_mena`) | `BTCUSDT-PERPETUAL,ETHUSDT-PERPETUAL,SKHYNIXUSDT-PERPETUAL,QQQUSDT-PERPETUAL,SPCXUSDT-PERPETUAL,SOXLUSDT-PERPETUAL,USDTUSDC,USDTAED` |
-| `BITGET_TARGET_SYMBOLS` | Comma-separated Bitget instIds (`BTCUSD` is routed to COIN-FUTURES, everything else to USDT-FUTURES) | `BTCUSDT,ETHUSDT` |
+| `BITGET_SPOT_TARGET_SYMBOLS` | Comma-separated Bitget spot symbols, written under `market_type` `spot` ([ADR 0009](docs/adr/0009-bitget-spot-and-perp-lists-and-v3-coin-margined.md)) | 19 symbols, see `config.py` |
+| `BITGET_PERP_TARGET_SYMBOLS` | Comma-separated Bitget perpetual symbols, written under `futures`. Routed by suffix: `_CM` coin-margined over the v3 WebSocket (e.g. `BTCUSD_CM`), `PERP` USDC-margined (e.g. `HYPEPERP`), anything else USDT-margined. The old `BITGET_TARGET_SYMBOLS` is no longer read | 24 symbols, see `config.py` |
 | `GATE_TARGET_SYMBOLS` | Comma-separated Gate.io contract names (`BTC_USD` uses the btc settle endpoint, others usdt) | `BTC_USDT,ETH_USDT,BTC_USD` |
 | `OSL_TARGET_SYMBOLS` | Comma-separated OSL v5 spot symbols (`BTCUSDC` does not exist on v5). Unknown symbols produce no WS data and REST kline errors | `BTCUSD,USDTUSD` |
 | `OSL_WS_URL` / `OSL_REST_URL` | OSL v5 public WebSocket and REST base URL (REST polling reads `/kline`) | `wss://stream-hk.osl.com/ws/v5/public` / `https://trade-hk.osl.com/api/v5` |
@@ -264,7 +267,8 @@ Symbols are exchange-native and used verbatim ([ADR 0002](docs/adr/0002-config-i
 | `HASHKEY_MENA_REST_RATE_LIMIT_RPS` | Global safety cap of requests per second for Hashkey MENA REST queries | `1.5` |
 | `HASHKEY_MENA_FUNDING_RATE_DELAY_MS` | Delay between sequential Hashkey MENA funding rate queries (one perpetual per query) | `500` |
 | `BITGET_REST_POLL_INTERVAL_MS` | Frequency of Bitget REST depth requests in milliseconds | `200` |
-| `BITGET_REST_RATE_LIMIT_RPS` | Global safety cap of requests per second for Bitget REST queries | `2.0` |
+| `BITGET_REST_RATE_LIMIT_RPS` | Cap of Bitget REST requests per second, applied to the spot and the perp collector separately (the orderbook endpoint allows 20 req/s/IP) | `5.0` |
+| `BITGET_WS_URL` / `BITGET_V3_WS_URL` | Bitget v2 public WebSocket, and the v3 one used only for coin-margined (`_CM`) perpetuals | `wss://ws.bitget.com/v2/ws/public` / `wss://ws.bitget.com/v3/ws/public` |
 | `GATE_REST_POLL_INTERVAL_MS` | Frequency of Gate.io REST depth requests in milliseconds | `200` |
 | `GATE_REST_RATE_LIMIT_RPS` | Global safety cap of requests per second for Gate.io REST queries | `2.0` |
 

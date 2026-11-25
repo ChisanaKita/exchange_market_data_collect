@@ -19,8 +19,9 @@ class MarketDataWriter:
         self.max_handles = 800  # Safe limit under standard 1024 OS descriptor limit
         self.lock = asyncio.Lock()
         self.current_day_utc = self._get_current_day_utc()
-        # Monotonic time of the last successful write per (exchange, symbol), read by DataFreshnessMonitor
-        self.last_write: Dict[Tuple[str, str], float] = {}
+        # Monotonic time of the last successful write per (exchange, market_type, symbol), read by
+        # DataFreshnessMonitor. market_type is part of the key because Bitget has BTCUSDT in both spot and futures.
+        self.last_write: Dict[Tuple[str, str, str], float] = {}
 
     def _get_current_day_utc(self) -> str:
         """Get current day formatted as YYYYMMDD in UTC."""
@@ -81,7 +82,7 @@ class MarketDataWriter:
             try:
                 line = json.dumps(payload, separators=(',', ':')) + "\n"
                 self.file_handles[handle_key].write(line)
-                self.last_write[(exchange, symbol)] = time.monotonic()
+                self.last_write[(exchange, market_type, symbol)] = time.monotonic()
             except Exception as e:
                 logger.error(f"Failed to write record to {handle_key}: {e}")
 

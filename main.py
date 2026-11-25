@@ -5,6 +5,7 @@ import signal
 
 from writer import MarketDataWriter
 from uploader import MarketDataUploader
+from collectors.bitget import SPOT as BITGET_SPOT, PERP as BITGET_PERP
 from collectors import (
     HashkeyGlobalCollector,
     HashkeyHkCollector,
@@ -18,7 +19,9 @@ from config import (
     HASHKEY_GLOBAL_TARGET_SYMBOLS,
     HASHKEY_HK_TARGET_SYMBOLS,
     HASHKEY_MENA_TARGET_SYMBOLS,
-    BITGET_TARGET_SYMBOLS,
+    BITGET_SPOT_TARGET_SYMBOLS,
+    BITGET_PERP_TARGET_SYMBOLS,
+    BITGET_LEGACY_TARGET_SYMBOLS_SET,
     GATE_TARGET_SYMBOLS,
     OSL_TARGET_SYMBOLS,
     PANTHER_TARGET_SYMBOLS,
@@ -36,6 +39,7 @@ from config import (
     HASHKEY_MENA_REST_RATE_LIMIT_RPS,
     HASHKEY_MENA_FUNDING_RATE_DELAY_MS,
     BITGET_WS_URL,
+    BITGET_V3_WS_URL,
     BITGET_REST_URL,
     BITGET_REST_POLL_INTERVAL_MS,
     BITGET_REST_RATE_LIMIT_RPS,
@@ -122,13 +126,22 @@ class Application:
                 ws_url=HASHKEY_MENA_WS_URL,
                 rest_url=HASHKEY_MENA_REST_URL
             ),
-            BitgetCollector(
-                writer=self.writer,
-                target_symbols=BITGET_TARGET_SYMBOLS,
-                rest_rate_limit_rps=BITGET_REST_RATE_LIMIT_RPS,
-                rest_poll_interval_ms=BITGET_REST_POLL_INTERVAL_MS,
-                ws_url=BITGET_WS_URL,
-                rest_url=BITGET_REST_URL
+            *(
+                BitgetCollector(
+                    writer=self.writer,
+                    target_symbols=symbols,
+                    market=market,
+                    rest_rate_limit_rps=BITGET_REST_RATE_LIMIT_RPS,
+                    rest_poll_interval_ms=BITGET_REST_POLL_INTERVAL_MS,
+                    ws_url=BITGET_WS_URL,
+                    v3_ws_url=BITGET_V3_WS_URL,
+                    rest_url=BITGET_REST_URL
+                )
+                for market, symbols in (
+                    (BITGET_SPOT, BITGET_SPOT_TARGET_SYMBOLS),
+                    (BITGET_PERP, BITGET_PERP_TARGET_SYMBOLS),
+                )
+                if symbols
             ),
             GateCollector(
                 writer=self.writer,
@@ -169,6 +182,12 @@ class Application:
                 "Panther collector disabled: set PANTHER_API_KEY, PANTHER_API_SECRET and PANTHER_PASSPHRASE to enable it."
             )
 
+        if BITGET_LEGACY_TARGET_SYMBOLS_SET:
+            logger.warning(
+                "BITGET_TARGET_SYMBOLS is no longer read; use BITGET_SPOT_TARGET_SYMBOLS and BITGET_PERP_TARGET_SYMBOLS.",
+                extra=ALERT
+            )
+
         # 3. Setup Graceful Shutdown Signal Handlers
         self._setup_signal_handlers()
 
@@ -182,14 +201,15 @@ class Application:
         # 6. Alert when any configured symbol stops producing data
         self.monitor = DataFreshnessMonitor(
             self.writer,
-            {collector.exchange_name: collector.target_symbols for collector in self.collectors},
+            [stream for collector in self.collectors for stream in collector.monitored_streams()],
             stale_after=STALE_DATA_ALERT_MINUTES * 60
         )
         await self.monitor.start()
 
-        exchanges = ", ".join(collector.exchange_name for collector in self.collectors)
+        # Bitget runs one collector per market, so count distinct exchange names
+        exchanges = list(dict.fromkeys(collector.exchange_name for collector in self.collectors))
         logger.info(
-            f"Collector started: {len(self.collectors)} exchanges active ({exchanges}).",
+            f"Collector started: {len(exchanges)} exchanges active ({', '.join(exchanges)}).",
             extra=ALERT
         )
         

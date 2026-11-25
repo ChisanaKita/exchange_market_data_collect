@@ -97,11 +97,63 @@ HASHKEY_MENA_TARGET_SYMBOLS = _parse_symbol_list(
     ],
 )
 
-# 2. Bitget
-BITGET_TARGET_SYMBOLS = _parse_symbol_list(
-    "BITGET_TARGET_SYMBOLS",
-    ["BTCUSDT", "ETHUSDT"],
+# 2. Bitget, one list per market (ADR 0009); the same symbol may appear in both.
+# Perpetuals are routed by suffix: "_CM" coin-margined (v3 WS), "PERP" USDC-margined, anything else USDT-margined.
+BITGET_SPOT_TARGET_SYMBOLS = _parse_symbol_list(
+    "BITGET_SPOT_TARGET_SYMBOLS",
+    [
+        "BTCUSDT",
+        "ETHUSDT",
+        "SOLUSDT",
+        "XRPUSDT",
+        "BNBUSDT",
+        "ADAUSDT",
+        "TRXUSDT",
+        "NEARUSDT",
+        "SUIUSDT",
+        "BGBUSDT",
+        "USDCUSDT",
+        "USDGOUSDT",
+        "DOGEUSDT",
+        "PEPEUSDT",
+        "XAUTUSDT",
+        "ZECUSDT",
+        "HYPEUSDT",
+        "WLDUSDT",
+        "ENAUSDT",
+    ],
 )
+BITGET_PERP_TARGET_SYMBOLS = _parse_symbol_list(
+    "BITGET_PERP_TARGET_SYMBOLS",
+    [
+        "BTCUSDT",
+        "ETHUSDT",
+        "SOLUSDT",
+        "HYPEUSDT",
+        "HYPEPERP",
+        "NEARUSDT",
+        "LISTAUSDT",
+        "BTCUSD_CM",
+        "NVDAUSDT",
+        "TSLAUSDT",
+        "AAPLUSDT",
+        "METAUSDT",
+        "AMZNUSDT",
+        "MSTRUSDT",
+        "PLTRUSDT",
+        "HONHAIUSDT",
+        "MEDIATEKUSDT",
+        "OPENAIUSDT",
+        "BZUSDT",
+        "CLUSDT",
+        "NATGASUSDT",
+        "DXYUSDT",
+        "TQQQUSDT",
+        "SKHYNIXUSDT",
+    ],
+)
+# Replaced by the two lists above and no longer read; main.py warns when it is still set
+BITGET_LEGACY_TARGET_SYMBOLS_SET = bool(os.getenv("BITGET_TARGET_SYMBOLS"))
 
 # 3. Gate.io
 GATE_TARGET_SYMBOLS = _parse_symbol_list(
@@ -123,7 +175,7 @@ EXCHANGE_TARGET_SYMBOLS = {
     "hashkey_global": HASHKEY_GLOBAL_TARGET_SYMBOLS,
     "hashkey": HASHKEY_HK_TARGET_SYMBOLS,
     "hashkey_mena": HASHKEY_MENA_TARGET_SYMBOLS,
-    "bitget": BITGET_TARGET_SYMBOLS,
+    "bitget": list(dict.fromkeys(BITGET_SPOT_TARGET_SYMBOLS + BITGET_PERP_TARGET_SYMBOLS)),
     "gate": GATE_TARGET_SYMBOLS,
     "osl": OSL_TARGET_SYMBOLS,
     "panther": PANTHER_TARGET_SYMBOLS,
@@ -187,9 +239,13 @@ HASHKEY_MENA_FUNDING_RATE_DELAY_MS = int(
 
 # 2. Bitget Settings
 BITGET_WS_URL = os.getenv("BITGET_WS_URL", "wss://ws.bitget.com/v2/ws/public")
+# Only coin-margined perpetuals ("_CM") use v3; the v2 WebSocket no longer lists them
+BITGET_V3_WS_URL = os.getenv("BITGET_V3_WS_URL", "wss://ws.bitget.com/v3/ws/public")
 BITGET_REST_URL = os.getenv("BITGET_REST_URL", "https://api.bitget.com")
 BITGET_REST_POLL_INTERVAL_MS = int(os.getenv("BITGET_REST_POLL_INTERVAL_MS", "200"))
-BITGET_REST_RATE_LIMIT_RPS = float(os.getenv("BITGET_REST_RATE_LIMIT_RPS", "2.0"))
+# Applied to the spot and the perp collector separately, so Bitget gets twice this in total. The orderbook
+# endpoint allows 20 req/s/IP.
+BITGET_REST_RATE_LIMIT_RPS = float(os.getenv("BITGET_REST_RATE_LIMIT_RPS", "5.0"))
 
 # 4. Gate.io Settings
 GATE_USDT_WS_URL = os.getenv("GATE_USDT_WS_URL", "wss://fx-ws.gateio.ws/v4/ws/usdt")

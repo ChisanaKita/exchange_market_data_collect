@@ -1,7 +1,7 @@
 import asyncio
 import logging
 import aiohttp
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Tuple
 from writer import MarketDataWriter
 
 logger = logging.getLogger("BaseExchangeCollector")
@@ -81,6 +81,14 @@ class BaseExchangeCollector:
             self.session = None
 
         self.logger.info(f"{self.exchange_name.capitalize()} Collector stopped.")
+
+    def get_market_type(self, symbol: str) -> str:
+        """market_type the collector writes for this symbol; override when it is not always "futures"."""
+        return "futures"
+
+    def monitored_streams(self) -> List[Tuple[str, str, str]]:
+        """(exchange, market_type, symbol) for every configured symbol, as read by DataFreshnessMonitor."""
+        return [(self.exchange_name, self.get_market_type(symbol), symbol) for symbol in self.target_symbols]
 
     def _start_ws_tasks(self) -> List[asyncio.Task]:
         """Override in subclass to define which WebSocket loops to run."""
