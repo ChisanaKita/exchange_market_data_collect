@@ -41,7 +41,7 @@ graph TD
 
 ### Key Design Pillars:
 1. **Abstracted Collector Core**: Uses a modular, inherited design (`BaseExchangeCollector`) that implements generalized WebSocket handling, connection recovery with exponential backoff, and REST polling.
-2. **Config as the Single Symbol Source**: Each exchange's target symbols are listed in `config.py` / env vars using that exchange's *native* names (e.g. Bitget `BTCUSDT`, Gate.io `BTC_USDT`, HashKey `BTCUSDT-PERPETUAL`). They are used verbatim for subscriptions, REST polling and the output folder names; collectors perform no symbol translation.
+2. **Config as the Single Symbol Source**: Each exchange's target symbols are listed only in `config.py` using that exchange's *native* names (e.g. Bitget `BTCUSDT`, Gate.io `BTC_USDT`, HashKey `BTCUSDT-PERPETUAL`). They are used verbatim for subscriptions, REST polling and the output folder names; collectors perform no symbol translation.
 3. **Fault Tolerance & Self-Healing**: Connections use robust reconnection loops with exponential backoff.
 4. **Rate Limit & IP Block Protection**: Incorporates an `AsyncRateLimiter` to keep REST queries under the official API limits for each exchange. It also detects HTTP 429 errors and automatically enforces a global 60-second backoff across polling coroutines.
 5. **Data Integrity**: File writes are **line-buffered** (`buffering=1`). In the event of a system or container crash, data is already committed to disk and will not be lost.
@@ -233,7 +233,7 @@ Symbols are `BASE-QUOTE` (`BTC-USD`). See [ADR 0004](docs/adr/0004-panther-colle
 
 Adjust parameters by copying `.env.example` to `.env` or setting system environment variables.
 
-Symbols are exchange-native and used verbatim ([ADR 0002](docs/adr/0002-config-is-the-single-symbol-source.md)); the HashKey site naming is in [ADR 0001](docs/adr/0001-per-exchange-symbols-and-hashkey-site-naming.md).
+**Target symbols are not configured here.** They are set only in `config.py` (the `*_TARGET_SYMBOLS` lists); `*_TARGET_SYMBOLS` environment variables are ignored and logged as a warning ([ADR 0010](docs/adr/0010-symbols-only-in-config-py.md)). Symbols are exchange-native and used verbatim ([ADR 0002](docs/adr/0002-config-is-the-single-symbol-source.md)); Bitget's spot/perp lists and perp routing are in [ADR 0009](docs/adr/0009-bitget-spot-and-perp-lists-and-v3-coin-margined.md); the HashKey site naming is in [ADR 0001](docs/adr/0001-per-exchange-symbols-and-hashkey-site-naming.md).
 
 | Key | Description | Default |
 |---|---|---|
@@ -242,15 +242,7 @@ Symbols are exchange-native and used verbatim ([ADR 0002](docs/adr/0002-config-i
 | `S3_PREFIX` | S3 folder prefix where day packages are stored | `crypto-market-data/` |
 | `LOCAL_DATA_DIR` | Directory on disk where raw data is temporarily cached | `./local_cache` |
 | `UPLOAD_DELAY_MINUTES` | Wait minutes after UTC midnight before archiving the past day | `5` |
-| `HASHKEY_GLOBAL_TARGET_SYMBOLS` | Comma-separated target symbols for Hashkey Global (`hashkey_global`). | `BTCUSDT-PERPETUAL,ETHUSDT-PERPETUAL` |
-| `HASHKEY_HK_TARGET_SYMBOLS` | Comma-separated HashKey-native target symbols for Hashkey HK (`hashkey`) | `BTCUSD,BTCUSDT,ETHUSD,ETHUSDT,SOLUSD,AVAXUSD,XRPUSD,LINKUSD,ARBUSD,USDTUSD,USDTHKD` |
-| `HASHKEY_MENA_TARGET_SYMBOLS` | Comma-separated HashKey-native target symbols for Hashkey MENA (`hashkey_mena`) | `BTCUSDT-PERPETUAL,ETHUSDT-PERPETUAL,SKHYNIXUSDT-PERPETUAL,QQQUSDT-PERPETUAL,SPCXUSDT-PERPETUAL,SOXLUSDT-PERPETUAL,USDTUSDC,USDTAED` |
-| `BITGET_SPOT_TARGET_SYMBOLS` | Comma-separated Bitget spot symbols, written under `market_type` `spot` ([ADR 0009](docs/adr/0009-bitget-spot-and-perp-lists-and-v3-coin-margined.md)) | 19 symbols, see `config.py` |
-| `BITGET_PERP_TARGET_SYMBOLS` | Comma-separated Bitget perpetual symbols, written under `futures`. Routed by suffix: `_CM` coin-margined over the v3 WebSocket (e.g. `BTCUSD_CM`), `PERP` USDC-margined (e.g. `HYPEPERP`), anything else USDT-margined. The old `BITGET_TARGET_SYMBOLS` is no longer read | 24 symbols, see `config.py` |
-| `GATE_TARGET_SYMBOLS` | Comma-separated Gate.io contract names (`BTC_USD` uses the btc settle endpoint, others usdt) | `BTC_USDT,ETH_USDT,BTC_USD` |
-| `OSL_TARGET_SYMBOLS` | Comma-separated OSL v5 spot symbols (`BTCUSDC` does not exist on v5). Unknown symbols produce no WS data and REST kline errors | `BTCUSD,USDTUSD` |
 | `OSL_WS_URL` / `OSL_REST_URL` | OSL v5 public WebSocket and REST base URL (REST polling reads `/kline`) | `wss://stream-hk.osl.com/ws/v5/public` / `https://trade-hk.osl.com/api/v5` |
-| `PANTHER_TARGET_SYMBOLS` | Comma-separated Panther spot symbols in `BASE-QUOTE` form | `USDT-USD,USDT-HKD,BTC-USD,ETH-USD` |
 | `PANTHER_API_KEY` / `PANTHER_API_SECRET` / `PANTHER_PASSPHRASE` | Panther API credentials (required; the collector is skipped if any is empty) | empty |
 | `PANTHER_WS_URL` / `PANTHER_REST_URL` | Panther WebSocket and REST base URL (UAT: `ws-api-uat` / `web-api-uat.panthertrade.com`, separate credentials) | `wss://ws-api.panthertrade.com/v1` / `https://web-api.panthertrade.com` |
 | `PANTHER_REST_POLL_INTERVAL_MS` / `PANTHER_REST_RATE_LIMIT_RPS` | REST poll interval and request cap. The documented limit is 2 rps/IP across all endpoints | `200` / `1.5` |

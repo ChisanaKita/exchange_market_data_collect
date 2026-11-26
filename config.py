@@ -44,29 +44,22 @@ UPLOAD_DELAY_MINUTES = int(os.getenv("UPLOAD_DELAY_MINUTES", "5"))
 # --- Target Symbols ---
 
 
-def _parse_symbol_list(env_var_name: str, default: list) -> list:
-    """Read a comma-separated symbol list; upper-cased and de-duplicated, order preserved."""
-    raw = os.getenv(env_var_name)
-    items = raw.split(",") if raw else default
-    symbols = []
-    for item in items:
-        symbol = item.strip().upper()
-        if symbol and symbol not in symbols:
-            symbols.append(symbol)
-    return symbols
+def _symbols(items: list) -> list:
+    """Upper-case and de-duplicate a symbol list, order preserved."""
+    return list(dict.fromkeys(item.strip().upper() for item in items if item.strip()))
 
-# Per-exchange target symbol lists. This file is the single source of truth: every symbol is the
+
+# Per-exchange target symbol lists. This file is the only source of truth: symbols are not read from the
+# environment or .env (ADR 0010); change them here and redeploy. Every symbol is the
 # exchange-native name and is used verbatim for subscriptions, REST polling and the output path
 # (e.g. Bitget "BTCUSDT", Gate.io "BTC_USDT", HashKey "BTCUSDT-PERPETUAL"). Collectors do no translation.
 # 1a. Hashkey Global
-HASHKEY_GLOBAL_TARGET_SYMBOLS = _parse_symbol_list(
-    "HASHKEY_GLOBAL_TARGET_SYMBOLS",
+HASHKEY_GLOBAL_TARGET_SYMBOLS = _symbols(
     ["BTCUSDT-PERPETUAL", "ETHUSDT-PERPETUAL"],
 )
 
 # 1b. Hashkey HK
-HASHKEY_HK_TARGET_SYMBOLS = _parse_symbol_list(
-    "HASHKEY_HK_TARGET_SYMBOLS",
+HASHKEY_HK_TARGET_SYMBOLS = _symbols(
     [
         "BTCUSD",
         "BTCUSDT",
@@ -83,8 +76,7 @@ HASHKEY_HK_TARGET_SYMBOLS = _parse_symbol_list(
 )
 
 # 1c. Hashkey MENA (UAE)
-HASHKEY_MENA_TARGET_SYMBOLS = _parse_symbol_list(
-    "HASHKEY_MENA_TARGET_SYMBOLS",
+HASHKEY_MENA_TARGET_SYMBOLS = _symbols(
     [
         "BTCUSDT-PERPETUAL",
         "ETHUSDT-PERPETUAL",
@@ -99,8 +91,7 @@ HASHKEY_MENA_TARGET_SYMBOLS = _parse_symbol_list(
 
 # 2. Bitget, one list per market (ADR 0009); the same symbol may appear in both.
 # Perpetuals are routed by suffix: "_CM" coin-margined (v3 WS), "PERP" USDC-margined, anything else USDT-margined.
-BITGET_SPOT_TARGET_SYMBOLS = _parse_symbol_list(
-    "BITGET_SPOT_TARGET_SYMBOLS",
+BITGET_SPOT_TARGET_SYMBOLS = _symbols(
     [
         "BTCUSDT",
         "ETHUSDT",
@@ -123,8 +114,7 @@ BITGET_SPOT_TARGET_SYMBOLS = _parse_symbol_list(
         "ENAUSDT",
     ],
 )
-BITGET_PERP_TARGET_SYMBOLS = _parse_symbol_list(
-    "BITGET_PERP_TARGET_SYMBOLS",
+BITGET_PERP_TARGET_SYMBOLS = _symbols(
     [
         "BTCUSDT",
         "ETHUSDT",
@@ -152,21 +142,19 @@ BITGET_PERP_TARGET_SYMBOLS = _parse_symbol_list(
         "SKHYNIXUSDT",
     ],
 )
-# Replaced by the two lists above and no longer read; main.py warns when it is still set
-BITGET_LEGACY_TARGET_SYMBOLS_SET = bool(os.getenv("BITGET_TARGET_SYMBOLS"))
+# Symbol env vars (from the environment or .env) are ignored; main.py warns about any still set
+IGNORED_SYMBOL_ENV_VARS = sorted(name for name in os.environ if name.endswith("_TARGET_SYMBOLS"))
 
 # 3. Gate.io
-GATE_TARGET_SYMBOLS = _parse_symbol_list(
-    "GATE_TARGET_SYMBOLS",
+GATE_TARGET_SYMBOLS = _symbols(
     ["BTC_USDT", "ETH_USDT", "BTC_USD"],
 )
 
 # 4. OSL
-OSL_TARGET_SYMBOLS = _parse_symbol_list("OSL_TARGET_SYMBOLS", ["BTCUSD", "USDTUSD"])
+OSL_TARGET_SYMBOLS = _symbols(["BTCUSD", "USDTUSD"])
 
 # 5. Panther (PantherTrade, spot; symbols are BASE-QUOTE)
-PANTHER_TARGET_SYMBOLS = _parse_symbol_list(
-    "PANTHER_TARGET_SYMBOLS",
+PANTHER_TARGET_SYMBOLS = _symbols(
     ["USDT-USD", "USDT-HKD", "BTC-USD", "ETH-USD"],
 )
 

@@ -21,7 +21,7 @@ from config import (
     HASHKEY_MENA_TARGET_SYMBOLS,
     BITGET_SPOT_TARGET_SYMBOLS,
     BITGET_PERP_TARGET_SYMBOLS,
-    BITGET_LEGACY_TARGET_SYMBOLS_SET,
+    IGNORED_SYMBOL_ENV_VARS,
     GATE_TARGET_SYMBOLS,
     OSL_TARGET_SYMBOLS,
     PANTHER_TARGET_SYMBOLS,
@@ -182,9 +182,10 @@ class Application:
                 "Panther collector disabled: set PANTHER_API_KEY, PANTHER_API_SECRET and PANTHER_PASSPHRASE to enable it."
             )
 
-        if BITGET_LEGACY_TARGET_SYMBOLS_SET:
+        if IGNORED_SYMBOL_ENV_VARS:
             logger.warning(
-                "BITGET_TARGET_SYMBOLS is no longer read; use BITGET_SPOT_TARGET_SYMBOLS and BITGET_PERP_TARGET_SYMBOLS.",
+                f"Ignoring {', '.join(IGNORED_SYMBOL_ENV_VARS)}: symbols are set only in config.py. "
+                "Remove these from the environment / .env.",
                 extra=ALERT
             )
 
